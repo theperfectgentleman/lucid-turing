@@ -6,13 +6,13 @@ WORKDIR /app
 
 # Copy package files for the root server and install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 # Copy client folder structure and package files
 COPY client/package*.json ./client/
 
 # Install client dependencies
-RUN cd client && npm ci
+RUN cd client && npm install --no-audit --no-fund
 
 # Copy the rest of the source code
 COPY . .
