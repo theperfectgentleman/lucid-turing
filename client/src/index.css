@@ -34,6 +34,8 @@
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
   --glass-filter: blur(12px) saturate(160%);
+  --bg-navbar: rgba(11, 15, 25, 0.8);
+  --nav-hover-bg: rgba(255, 255, 255, 0.05);
 }
 
 /* Light Theme Variables */
@@ -55,6 +57,8 @@ body.light-theme {
   --primary-glow: rgba(79, 70, 229, 0.15);
   --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
   --glass-filter: blur(12px);
+  --bg-navbar: rgba(255, 255, 255, 0.85);
+  --nav-hover-bg: rgba(0, 0, 0, 0.05);
 }
 
 * {
@@ -110,12 +114,13 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  background: rgba(11, 15, 25, 0.8);
+  background: var(--bg-navbar);
   backdrop-filter: var(--glass-filter);
   border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   z-index: 100;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .logo {
@@ -155,7 +160,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .nav-button:hover, .nav-button.active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--nav-hover-bg);
   border-color: var(--border-color);
 }
 
@@ -831,7 +836,7 @@ body.light-theme .audio-source-select {
 
 .mobile-nav-item:hover, .mobile-nav-item.active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--nav-hover-bg);
   border-color: var(--border-color);
 }
 

@@ -10,8 +10,17 @@ import { LayoutGrid, Brain, Zap, Settings, Award, LogOut, Lock, User, Clock, Sun
 import './App.css'
 
 function App() {
-  const [authState, setAuthState] = useState('logged-out') // 'logged-out', 'student', 'admin'
-  const [currentUser, setCurrentUser] = useState(null) // { id, name }
+  const [authState, setAuthState] = useState(() => {
+    return localStorage.getItem('bee_speller_auth_state') || 'logged-out';
+  }) // 'logged-out', 'student', 'admin'
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('bee_speller_current_user');
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  }) // { id, name }
   const [profiles, setProfiles] = useState([])
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [pinInput, setPinInput] = useState('')
@@ -28,6 +37,18 @@ function App() {
       document.body.classList.remove('light-theme');
     }
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('bee_speller_auth_state', authState);
+  }, [authState]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('bee_speller_current_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('bee_speller_current_user');
+    }
+  }, [currentUser]);
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -128,6 +149,8 @@ function App() {
     setCurrentUser(null)
     setIsAdminMode(false)
     setAuthError('')
+    localStorage.removeItem('bee_speller_auth_state')
+    localStorage.removeItem('bee_speller_current_user')
   }
 
   const startCustomSession = async (config) => {

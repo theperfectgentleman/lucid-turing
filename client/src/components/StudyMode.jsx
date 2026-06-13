@@ -20,6 +20,7 @@ export default function StudyMode({ setView, currentUser, customWords }) {
   const [touchEndX, setTouchEndX] = useState(null);
   const [showWordListModal, setShowWordListModal] = useState(false);
   const [wordStatuses, setWordStatuses] = useState({});
+  const [hasStartedRound, setHasStartedRound] = useState(false);
 
   const [audioSource, setAudioSource] = useState(() => {
     return localStorage.getItem('bee_speller_audio_source') || 'ai';
@@ -221,6 +222,70 @@ export default function StudyMode({ setView, currentUser, customWords }) {
           </button>
           <button className="btn btn-primary" onClick={fetchDueWords}>
             <RefreshCw size={16} /> Check Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (!hasStartedRound) {
+    return (
+      <div className="practice-container">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', marginBottom: '4px' }}>Ready to Learn! 🐝</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>You are about to learn {words.length} words in this round.</p>
+          </div>
+          <button className="btn btn-secondary" onClick={() => setView('dashboard')}>
+            <ArrowLeft size={16} /> Dashboard
+          </button>
+        </div>
+
+        <div className="card" style={{ padding: '32px', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📚</div>
+          <h3 style={{ fontSize: '20px', marginBottom: '12px', fontWeight: '800' }}>Here are your words for this session:</h3>
+          
+          <div style={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: '10px', 
+            justifyContent: 'center', 
+            margin: '24px 0', 
+            maxHeight: '240px', 
+            overflowY: 'auto',
+            padding: '12px',
+            background: 'rgba(0, 0, 0, 0.15)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-color)'
+          }}>
+            {words.map((w, idx) => (
+              <span 
+                key={w.id} 
+                className="origin-badge" 
+                style={{ 
+                  fontSize: '15px', 
+                  padding: '8px 16px', 
+                  fontWeight: '700',
+                  color: 'var(--text-primary)',
+                  borderColor: 'var(--border-color)',
+                  background: 'rgba(255, 255, 255, 0.03)'
+                }}
+              >
+                {idx + 1}. {w.word}
+              </span>
+            ))}
+          </div>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', lineHeight: '1.5' }}>
+            In this study round, you'll see the words, hear them pronounced, and explore their syllables (Lego Blocks). 
+            Then, you can flip the card to test your spelling memory!
+          </p>
+
+          <button 
+            className="btn btn-accent" 
+            style={{ width: '100%', maxWidth: '320px', fontSize: '18px', padding: '14px 28px', fontWeight: 'bold' }} 
+            onClick={() => setHasStartedRound(true)}
+          >
+            Start Learning Now! 🚀
           </button>
         </div>
       </div>
