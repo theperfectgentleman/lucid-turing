@@ -18,7 +18,7 @@ RUN cd client && npm ci
 COPY . .
 
 # Build the frontend assets into client/dist
-RUN npm run build-client
+RUN cd client && npm run build
 
 # Remove development dependencies to keep the image slim
 RUN npm prune --production && cd client && rm -rf node_modules
@@ -43,5 +43,5 @@ EXPOSE 5000
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# Run the server
-CMD ["npm", "start"]
+# Run the server directly (better signal handling than npm start)
+CMD ["node", "server.js"]

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, AlertCircle, Award, Settings, Brain, Zap, Clock } from 'lucide-react';
 
-export default function Dashboard({ setView }) {
+export default function Dashboard({ setView, currentUser }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,7 +13,7 @@ export default function Dashboard({ setView }) {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/words/stats');
+      const res = await fetch(`/api/words/stats?userId=${currentUser.id}`);
       if (!res.ok) throw new Error('Failed to fetch statistics');
       const data = await res.json();
       setStats(data);
@@ -61,7 +61,7 @@ export default function Dashboard({ setView }) {
   return (
     <div>
       <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '28px', marginBottom: '8px' }}>Welcome to BeeSpeller AI 🐝</h2>
+        <h2 style={{ fontSize: '28px', marginBottom: '8px' }}>Welcome to BeeSpeller AI, {currentUser?.name}! 🐝</h2>
         <p style={{ color: 'var(--text-secondary)' }}>Your personalized 4-week dashboard for Spelling Bee mastery.</p>
       </div>
 

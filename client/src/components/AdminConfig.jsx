@@ -613,6 +613,7 @@ export default function AdminConfig({ setView }) {
             </div>
           )}
         </div>
+      )}
       {/* TAB 3: USER PROFILES */}
       {activeTab === 'users' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', alignItems: 'start' }}>

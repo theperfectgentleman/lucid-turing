@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, Award, Zap, ArrowLeft, Check, X, AlertTriangle } from 'lucide-react';
 
-export default function SpeedRound({ setView }) {
+export default function SpeedRound({ setView, currentUser, customWords }) {
   const [words, setWords] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -20,15 +20,20 @@ export default function SpeedRound({ setView }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    fetchRandomWords();
+    if (customWords && customWords.length > 0) {
+      setWords(customWords);
+      setLoading(false);
+    } else {
+      fetchRandomWords();
+    }
     return () => clearInterval(timerRef.current);
-  }, []);
+  }, [customWords]);
 
   const fetchRandomWords = async () => {
     try {
       setLoading(true);
       // Fetch 100 random words so they don't run out during the 90 seconds
-      const res = await fetch('/api/words/random?limit=100');
+      const res = await fetch(`/api/words/random?limit=100&userId=${currentUser.id}`);
       if (!res.ok) throw new Error('Failed to fetch words');
       const data = await res.json();
       setWords(data.words || []);
@@ -87,7 +92,7 @@ export default function SpeedRound({ setView }) {
       await fetch(`/api/words/${wordId}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quality })
+        body: JSON.stringify({ quality, userId: currentUser.id })
       });
     } catch (e) {
       console.error(e);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, ChevronRight, HelpCircle, Check, X, ArrowLeft, RefreshCw, Layers } from 'lucide-react';
 
-export default function StudyMode({ setView }) {
+export default function StudyMode({ setView, currentUser, customWords }) {
   const [words, setWords] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -21,13 +21,18 @@ export default function StudyMode({ setView }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    fetchDueWords();
-  }, []);
+    if (customWords && customWords.length > 0) {
+      setWords(customWords);
+      setLoading(false);
+    } else {
+      fetchDueWords();
+    }
+  }, [customWords]);
 
   const fetchDueWords = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/words/due?limit=15');
+      const res = await fetch(`/api/words/due?limit=15&userId=${currentUser.id}`);
       if (!res.ok) throw new Error('Failed to fetch words');
       const data = await res.json();
       setWords(data.words || []);
@@ -120,7 +125,7 @@ export default function StudyMode({ setView }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ quality })
+        body: JSON.stringify({ quality, userId: currentUser.id })
       });
     } catch (error) {
       console.error('Error saving word review:', error);

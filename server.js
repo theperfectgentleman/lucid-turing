@@ -312,6 +312,160 @@ app.get('/api/words/random', async (req, res) => {
   }
 });
 
+// Shuffles an array in place
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// 8.5 Get history of practiced words for this user
+app.get('/api/words/history', async (req, res) => {
+  try {
+    const { userId, category, limit = 50, page = 1 } = req.query;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    const offset = (page - 1) * limit;
+    
+    let query = `
+      SELECT w.*, 
+             p.box, 
+             p.attempts, 
+             p.correct_attempts, 
+             p.next_review_date, 
+             p.last_quality
+      FROM user_word_progress p
+      JOIN words w ON p.word_id = w.id
+      WHERE p.user_id = $1 AND p.attempts > 0
+    `;
+    const params = [userId];
+    let paramIndex = 2;
+    
+    if (category) {
+      query += ` AND w.category = $${paramIndex++}`;
+      params.push(category);
+    }
+    
+    // Get total for pagination
+    const countQuery = `SELECT COUNT(*) FROM (${query}) as total`;
+    const totalRes = await db.query(countQuery, params);
+    const total = parseInt(totalRes.rows[0].count);
+    
+    query += ` ORDER BY p.next_review_date DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    params.push(parseInt(limit), offset);
+    
+    const result = await db.query(query, params);
+    
+    res.json({
+      words: result.rows,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+  } catch (error) {
+    console.error('Error fetching history:', error);
+    res.status(500).json({ error: 'Server error fetching practice history' });
+  }
+});
+
+// 8.6 Get custom words query (random/sequential settings, categories filtering, history source option)
+app.get('/api/words/custom', async (req, res) => {
+  try {
+    const { userId, source = 'all', category = 'all', orderWords = 'random', orderCategories = 'random', limit = 20 } = req.query;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    let query = '';
+    const params = [userId];
+    
+    if (source === 'history') {
+      // Query words already practiced
+      query = `
+        SELECT w.*, 
+               COALESCE(p.box, 1) as box, 
+               COALESCE(p.attempts, 0) as attempts,
+               COALESCE(p.correct_attempts, 0) as correct_attempts
+        FROM user_word_progress p
+        JOIN words w ON p.word_id = w.id
+        WHERE p.user_id = $1 AND p.attempts > 0
+      `;
+    } else if (source === 'srs') {
+      // Query due / new words
+      query = `
+        SELECT w.*, 
+               COALESCE(p.box, 1) as box, 
+               COALESCE(p.attempts, 0) as attempts,
+               COALESCE(p.correct_attempts, 0) as correct_attempts
+        FROM words w
+        LEFT JOIN user_word_progress p ON p.word_id = w.id AND p.user_id = $1
+        WHERE (p.next_review_date <= NOW() OR p.attempts IS NULL OR p.attempts = 0)
+      `;
+    } else {
+      // Query all words
+      query = `
+        SELECT w.*, 
+               COALESCE(p.box, 1) as box, 
+               COALESCE(p.attempts, 0) as attempts,
+               COALESCE(p.correct_attempts, 0) as correct_attempts
+        FROM words w
+        LEFT JOIN user_word_progress p ON p.word_id = w.id AND p.user_id = $1
+        WHERE 1=1
+      `;
+    }
+    
+    if (category && category !== 'all') {
+      query += ` AND w.category = $2`;
+      params.push(category);
+    }
+    
+    const result = await db.query(query, params);
+    let words = result.rows;
+    
+    // Group words by category for custom sorting
+    const groups = {};
+    words.forEach(w => {
+      const cat = w.category || 'Other';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(w);
+    });
+    
+    // Process words in each category
+    Object.keys(groups).forEach(cat => {
+      if (orderWords === 'random') {
+        shuffleArray(groups[cat]);
+      } else {
+        // Sequential (Alphabetical)
+        groups[cat].sort((a, b) => a.word.localeCompare(b.word));
+      }
+    });
+    
+    // Order categories
+    let categoriesList = Object.keys(groups);
+    if (orderCategories === 'random') {
+      shuffleArray(categoriesList);
+    } else {
+      // Sequential by category name
+      categoriesList.sort((a, b) => a.localeCompare(b));
+    }
+    
+    // Flatten list
+    let resultWords = [];
+    categoriesList.forEach(cat => {
+      resultWords = resultWords.concat(groups[cat]);
+    });
+    
+    // Slice by limit
+    res.json({ words: resultWords.slice(0, parseInt(limit)) });
+  } catch (error) {
+    console.error('Error fetching custom words:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // 9. Update SRS status of a word (SuperMemo-2 SM2)
 app.post('/api/words/:id/review', async (req, res) => {
   const { id } = req.params;
