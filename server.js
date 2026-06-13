@@ -729,6 +729,29 @@ app.delete('/api/admin/users/:id', async (req, res) => {
   }
 });
 
+// Update user profile (Admin)
+app.put('/api/admin/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, pin } = req.body;
+  if (!name || !pin) {
+    return res.status(400).json({ error: 'Name and PIN are required' });
+  }
+  try {
+    const check = await db.query("SELECT id FROM user_profiles WHERE LOWER(name) = LOWER($1) AND id != $2", [name.trim(), id]);
+    if (check.rows.length > 0) {
+      return res.status(400).json({ error: 'Another profile with this name already exists' });
+    }
+    await db.query(
+      "UPDATE user_profiles SET name = $1, pin = $2 WHERE id = $3",
+      [name.trim(), pin.trim(), id]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error updating user profile' });
+  }
+});
+
 // Serve frontend static assets in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, 'client/dist')));

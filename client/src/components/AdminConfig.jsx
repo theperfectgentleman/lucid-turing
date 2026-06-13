@@ -36,6 +36,14 @@ export default function AdminConfig({ setView }) {
   const [newUserName, setNewUserName] = useState('');
   const [newUserPin, setNewUserPin] = useState('');
   const [usersLoading, setUsersLoading] = useState(false);
+  const [editingUserProfileId, setEditingUserProfileId] = useState(null);
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserPin, setEditUserPin] = useState('');
+
+  useEffect(() => {
+    fetchDbWords();
+    fetchDbTags();
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'manage') {
@@ -143,6 +151,45 @@ export default function AdminConfig({ setView }) {
       } else {
         const err = await res.json();
         alert(err.error || 'Failed to delete user profile');
+      }
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleEditUserClick = (user) => {
+    setEditingUserProfileId(user.id);
+    setEditUserName(user.name);
+    setEditUserPin(user.pin);
+  };
+
+  const handleCancelUserEdit = () => {
+    setEditingUserProfileId(null);
+    setEditUserName('');
+    setEditUserPin('');
+  };
+
+  const handleSaveUserEdit = async (userId) => {
+    if (!editUserName.trim() || !editUserPin.trim()) {
+      alert("Name and PIN are required.");
+      return;
+    }
+    if (editUserPin.trim().length < 4) {
+      alert("PIN must be at least 4 digits.");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editUserName.trim(), pin: editUserPin.trim() })
+      });
+      if (res.ok) {
+        handleCancelUserEdit();
+        fetchUserProfiles();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to update profile');
       }
     } catch (e) {
       alert(e.message);
@@ -286,6 +333,10 @@ export default function AdminConfig({ setView }) {
       setExtractedWords([]);
       setSelectedFile(null);
       setPreviewUrl(null);
+      
+      // Update database list and count/tags immediately
+      fetchDbWords();
+      fetchDbTags();
     } catch (e) {
       console.error(e);
       alert("Error saving words database: " + e.message);
@@ -885,15 +936,58 @@ export default function AdminConfig({ setView }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {userProfiles.map(u => (
                   <div key={u.id} style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'rgba(255,255,255,0.01)' }}>
-                    <div>
-                      <strong style={{ fontSize: '16px', display: 'block' }}>{u.name}</strong>
-                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        PIN code: <strong style={{ color: 'var(--accent)' }}>{u.pin}</strong>
-                      </span>
+                    {editingUserProfileId === u.id ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexGrow: 1, marginRight: '16px' }}>
+                        <input
+                          type="text"
+                          value={editUserName}
+                          onChange={(e) => setEditUserName(e.target.value)}
+                          className="form-control"
+                          style={{ fontSize: '14px', padding: '6px 10px' }}
+                          placeholder="Name"
+                          required
+                        />
+                        <input
+                          type="text"
+                          maxLength="8"
+                          value={editUserPin}
+                          onChange={(e) => setEditUserPin(e.target.value.replace(/\D/g, ''))}
+                          className="form-control"
+                          style={{ fontSize: '14px', padding: '6px 10px' }}
+                          placeholder="PIN code"
+                          required
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <strong style={{ fontSize: '16px', display: 'block' }}>{u.name}</strong>
+                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          PIN code: <strong style={{ color: 'var(--accent)' }}>{u.pin}</strong>
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {editingUserProfileId === u.id ? (
+                        <>
+                          <button className="btn btn-accent" style={{ padding: '6px 12px', minWidth: 'auto', fontSize: '13px' }} onClick={() => handleSaveUserEdit(u.id)}>
+                            Save
+                          </button>
+                          <button className="btn btn-secondary" style={{ padding: '6px 12px', minWidth: 'auto', fontSize: '13px' }} onClick={handleCancelUserEdit}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn btn-secondary" style={{ padding: '8px', minWidth: 'auto' }} onClick={() => handleEditUserClick(u)} title="Edit Profile">
+                            <Edit3 size={16} />
+                          </button>
+                          <button className="btn btn-danger" style={{ padding: '8px', minWidth: 'auto' }} onClick={() => handleDeleteUser(u.id)} title="Delete Profile">
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
-                    <button className="btn btn-danger" style={{ padding: '8px', minWidth: 'auto' }} onClick={() => handleDeleteUser(u.id)} title="Delete Profile">
-                      <Trash2 size={16} />
-                    </button>
                   </div>
                 ))}
               </div>
