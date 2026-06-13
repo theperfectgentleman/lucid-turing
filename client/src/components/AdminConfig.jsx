@@ -5,6 +5,9 @@ export default function AdminConfig({ setView }) {
   const [activeTab, setActiveTab] = useState('upload'); // 'upload' or 'manage'
   
   // Tab 1: Upload & Extract
+  const [importMode, setImportMode] = useState('image'); // 'image' or 'paste'
+  const [pastedText, setPastedText] = useState('');
+  const [pasteCategory, setPasteCategory] = useState('Other');
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -190,6 +193,43 @@ export default function AdminConfig({ setView }) {
     }
   };
 
+  const handleExtractPastedText = async () => {
+    if (!pastedText.trim()) {
+      alert("Please paste some text first.");
+      return;
+    }
+    
+    try {
+      setIsExtracting(true);
+      setSaveStatus(null);
+      
+      const res = await fetch('/api/admin/extract-pasted-words', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: pastedText, category: pasteCategory })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Extraction failed');
+      }
+      
+      const data = await res.json();
+      // Add a 'selected' flag to all extracted words by default (select new words, deselect already existing ones)
+      const wordsWithSelection = (data.words || []).map(w => ({
+        ...w,
+        selected: !w.alreadyExists
+      }));
+      
+      setExtractedWords(wordsWithSelection);
+    } catch (error) {
+      console.error(error);
+      alert(`Error extracting words: ${error.message}`);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
   const handleExtractedWordChange = (index, field, value) => {
     const updated = [...extractedWords];
     updated[index][field] = value;
@@ -320,40 +360,138 @@ export default function AdminConfig({ setView }) {
       {/* TAB 1: UPLOAD AND EXTRACT */}
       {activeTab === 'upload' && (
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: previewUrl ? '320px 1fr' : '1fr', gap: '24px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: (importMode === 'paste' || previewUrl) ? '320px 1fr' : '1fr', gap: '24px', alignItems: 'start' }}>
             
-            {/* Upload Area */}
-            <div className="card">
-              <h3 style={{ fontSize: '16px', marginBottom: '16px' }}>Select Booklet Page Image</h3>
-              <div 
-                className="upload-zone"
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current.click()}
-              >
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileChange} 
-                  accept="image/*" 
-                  style={{ display: 'none' }} 
-                />
-                <Upload size={32} style={{ color: 'var(--text-secondary)', marginBottom: '12px' }} />
-                <p style={{ fontSize: '14px', fontWeight: '500' }}>Drag & drop image here</p>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>or click to browse files</span>
+            {/* Upload Area / Paste Area */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                <button 
+                  className={`btn ${importMode === 'image' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ flex: 1, padding: '8px', fontSize: '14px', fontWeight: 'bold' }}
+                  onClick={() => {
+                    setImportMode('image');
+                    setExtractedWords([]);
+                    setSaveStatus(null);
+                  }}
+                >
+                  Image Upload
+                </button>
+                <button 
+                  className={`btn ${importMode === 'paste' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ flex: 1, padding: '8px', fontSize: '14px', fontWeight: 'bold' }}
+                  onClick={() => {
+                    setImportMode('paste');
+                    setExtractedWords([]);
+                    setSaveStatus(null);
+                  }}
+                >
+                  Paste Text
+                </button>
               </div>
 
-              {previewUrl && (
-                <div style={{ marginTop: '20px' }}>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Image Preview:</p>
-                  <img src={previewUrl} alt="Preview" style={{ width: '100%', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }} />
-                  <button className="btn btn-primary" style={{ width: '100%', marginTop: '16px' }} onClick={handleExtract} disabled={isExtracting}>
+              {importMode === 'image' ? (
+                <div>
+                  <h3 style={{ fontSize: '16px', marginBottom: '16px' }}>Select Booklet Page Image</h3>
+                  <div 
+                    className="upload-zone"
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current.click()}
+                  >
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleFileChange} 
+                      accept="image/*" 
+                      style={{ display: 'none' }} 
+                    />
+                    <Upload size={32} style={{ color: 'var(--text-secondary)', marginBottom: '12px' }} />
+                    <p style={{ fontSize: '14px', fontWeight: '500' }}>Drag & drop image here</p>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>or click to browse files</span>
+                  </div>
+
+                  {previewUrl && (
+                    <div style={{ marginTop: '20px' }}>
+                      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Image Preview:</p>
+                      <img src={previewUrl} alt="Preview" style={{ width: '100%', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }} />
+                      <button className="btn btn-primary" style={{ width: '100%', marginTop: '16px' }} onClick={handleExtract} disabled={isExtracting}>
+                        {isExtracting ? (
+                          <>
+                            <Loader size={16} className="spinner" /> Extracting Words...
+                          </>
+                        ) : (
+                          'Analyze Image with Gemini'
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <h3 style={{ fontSize: '16px', marginBottom: '4px' }}>Paste Word List</h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    Paste words here. Separations (spaces, newlines, commas, columns, or bullet points) are robustly detected.
+                  </p>
+                  
+                  <textarea
+                    placeholder="Enter words or copy-paste list here...&#10;e.g.&#10;1. cacophony&#10;2. archetype&#10;3. reservoir&#10;Or: acoustic, sound, frequency"
+                    value={pastedText}
+                    onChange={(e) => setPastedText(e.target.value)}
+                    className="form-control"
+                    style={{ minHeight: '180px', fontFamily: 'monospace', fontSize: '14px', resize: 'vertical' }}
+                  />
+
+                  <div>
+                    <label className="form-label" style={{ fontSize: '12px', marginBottom: '4px', display: 'block', fontWeight: '500' }}>
+                      Target Language of Origin (Category)
+                    </label>
+                    <select
+                      value={['Afrikaans', 'French', 'Greek', 'Latin', 'German', 'Dutch', 'Italian'].includes(pasteCategory) ? pasteCategory : 'Other'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Other') {
+                          setPasteCategory('Other');
+                        } else {
+                          setPasteCategory(val);
+                        }
+                      }}
+                      className="form-control"
+                      style={{ marginBottom: '8px' }}
+                    >
+                      <option value="Other">Other / Custom</option>
+                      <option value="Afrikaans">Afrikaans</option>
+                      <option value="French">French</option>
+                      <option value="Greek">Greek</option>
+                      <option value="Latin">Latin</option>
+                      <option value="German">German</option>
+                      <option value="Dutch">Dutch</option>
+                      <option value="Italian">Italian</option>
+                    </select>
+                    
+                    {(!['Afrikaans', 'French', 'Greek', 'Latin', 'German', 'Dutch', 'Italian'].includes(pasteCategory) || pasteCategory === 'Other') && (
+                      <input
+                        type="text"
+                        placeholder="Enter custom category name (e.g. Arabic)..."
+                        value={pasteCategory === 'Other' ? '' : pasteCategory}
+                        onChange={(e) => setPasteCategory(e.target.value || 'Other')}
+                        className="form-control"
+                        style={{ fontSize: '13px' }}
+                      />
+                    )}
+                  </div>
+
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ width: '100%', marginTop: '8px' }} 
+                    onClick={handleExtractPastedText} 
+                    disabled={isExtracting}
+                  >
                     {isExtracting ? (
                       <>
-                        <Loader size={16} className="spinner" /> Extracting Words...
+                        <Loader size={16} className="spinner" /> Parsing Words...
                       </>
                     ) : (
-                      'Analyze Image with Gemini'
+                      'Verify & Parse Words'
                     )}
                   </button>
                 </div>
@@ -374,7 +512,7 @@ export default function AdminConfig({ setView }) {
               {isExtracting && (
                 <div style={{ textAlign: 'center', padding: '64px 0' }}>
                   <Loader size={40} className="spinner" style={{ color: 'var(--primary-hover)', marginBottom: '16px' }} />
-                  <h4>Gemini is reading the image booklet...</h4>
+                  <h4>{importMode === 'image' ? 'Gemini is reading the image booklet...' : 'Gemini is processing your pasted words...'}</h4>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '8px' }}>
                     Extracting spellings, detecting origin languages, and auto-generating definitions & Lego block breakdowns.
                   </p>
@@ -396,7 +534,12 @@ export default function AdminConfig({ setView }) {
               {!isExtracting && extractedWords.length === 0 && !saveStatus && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', color: 'var(--text-secondary)' }}>
                   <AlertCircle size={36} style={{ marginBottom: '12px' }} />
-                  <p>Upload a spelling booklet page on the left and click "Analyze Image" to extract words.</p>
+                  <p>
+                    {importMode === 'image' 
+                      ? 'Upload a spelling booklet page on the left and click "Analyze Image" to extract words.'
+                      : 'Paste spelling bee words on the left and click "Verify & Parse Words" to process them.'
+                    }
+                  </p>
                 </div>
               )}
 

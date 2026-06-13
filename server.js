@@ -3,7 +3,7 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const db = require('./db');
-const { extractWordsFromImage } = require('./gemini');
+const { extractWordsFromImage, extractWordsFromText } = require('./gemini');
 require('dotenv').config();
 
 const app = express();
@@ -93,6 +93,36 @@ app.post('/api/admin/extract-words', upload.single('image'), async (req, res) =>
   } catch (error) {
     console.error('Error in word extraction:', error);
     res.status(500).json({ error: error.message || 'Error extracting words' });
+  }
+});
+
+// 2b. Extract words from pasted text
+app.post('/api/admin/extract-pasted-words', async (req, res) => {
+  try {
+    const { text, category } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'No text provided' });
+    }
+    
+    const extractionResult = await extractWordsFromText(text, category);
+    
+    // Check which words are already in the database
+    const extractedWordsList = extractionResult.words || [];
+    const enrichedWords = [];
+    
+    for (const w of extractedWordsList) {
+      if (!w.word) continue;
+      const dbCheck = await db.query('SELECT id FROM words WHERE LOWER(word) = LOWER($1)', [w.word.trim()]);
+      enrichedWords.push({
+        ...w,
+        alreadyExists: dbCheck.rows.length > 0
+      });
+    }
+    
+    res.json({ words: enrichedWords });
+  } catch (error) {
+    console.error('Error in text word extraction:', error);
+    res.status(500).json({ error: error.message || 'Error extracting words from text' });
   }
 });
 

@@ -47,9 +47,9 @@ const extractWordsFromImage = async (imageBuffer, mimeType) => {
     throw new Error("GEMINI_API_KEY is not defined in the environment variables.");
   }
 
-  // Use gemini-3-pro-preview (3rd gen Pro model) for highly accurate OCR and etymology
+  // Use gemini-3.5-flash (3rd gen Flash model) for highly accurate OCR and etymology
   const model = genAI.getGenerativeModel({
-    model: "gemini-3-pro-preview",
+    model: "gemini-3.5-flash",
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: responseSchema,
@@ -92,6 +92,53 @@ const extractWordsFromImage = async (imageBuffer, mimeType) => {
   }
 };
 
+const extractWordsFromText = async (text, defaultCategory) => {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is not defined in the environment variables.");
+  }
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-3.5-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: responseSchema,
+      temperature: 0.1
+    }
+  });
+
+  const prompt = `
+    Analyze this pasted text containing spelling bee words:
+    """
+    ${text}
+    """
+    
+    Perform the following:
+    1. Parse the text and extract all spelling words. The text may separate words using spaces, commas, newlines, semicolons, tabs, numbers, bullet points, or columns. Be robust in identifying where words start and end.
+    2. Clean the spelling: remove leading numbers, dots, dashes, or punctuation. Make it correct casing (lowercase unless a proper noun).
+    3. Tag each word with the category "${defaultCategory || 'Other'}" unless the text explicitly indicates a different category for certain words.
+    4. Generate a high-quality, simple definition suitable for a junior spelling bee participant.
+    5. Create a memorable, clear contextual sentence using the word.
+    6. Determine its part of speech.
+    7. Break the word down into 'Lego Blocks' (morphemes or syllables) with their meanings. E.g. for "hydrophobia", break it into "hydro" (root, meaning: water), "phob" (root, meaning: fear), "ia" (suffix, meaning: condition). If it is a root word that can't be easily broken into morphemes, break it into syllables and explain how it's built.
+    8. Provide any common alternate pronunciations if applicable.
+    9. Write a helpful spelling tip based on etymology rules (e.g. for Afrikaans: "Afrikaans words often spell the /f/ sound as 'v' and the /v/ sound as 'w'").
+    
+    Ensure all fields are fully populated and accurate. Return ONLY JSON.
+  `;
+
+  try {
+    console.log("Sending request to Gemini API for text parsing...");
+    const result = await model.generateContent([prompt]);
+    const responseText = result.response.text();
+    console.log("Gemini API returned response.");
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error("Error calling Gemini API:", error);
+    throw error;
+  }
+};
+
 module.exports = {
-  extractWordsFromImage
+  extractWordsFromImage,
+  extractWordsFromText
 };
