@@ -68,6 +68,22 @@ app.get('/api/words/stats', async (req, res) => {
   }
 });
 
+// 1.5. Get distinct tags
+app.get('/api/words/tags', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT DISTINCT tag 
+      FROM words 
+      WHERE tag IS NOT NULL AND tag != '' 
+      ORDER BY tag ASC
+    `);
+    res.json({ tags: result.rows.map(row => row.tag) });
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    res.status(500).json({ error: 'Server error fetching tags' });
+  }
+});
+
 // 2. OCR and extract words from booklet image
 app.post('/api/admin/extract-words', upload.single('image'), async (req, res) => {
   try {
@@ -75,6 +91,7 @@ app.post('/api/admin/extract-words', upload.single('image'), async (req, res) =>
       return res.status(400).json({ error: 'No image uploaded' });
     }
     
+    const tag = req.body.tag || '';
     const extractionResult = await extractWordsFromImage(req.file.buffer, req.file.mimetype);
     
     // Check which words are already in the database
@@ -85,6 +102,7 @@ app.post('/api/admin/extract-words', upload.single('image'), async (req, res) =>
       const dbCheck = await db.query('SELECT id FROM words WHERE LOWER(word) = LOWER($1)', [w.word.trim()]);
       enrichedWords.push({
         ...w,
+        tag: tag,
         alreadyExists: dbCheck.rows.length > 0
       });
     }
@@ -99,7 +117,7 @@ app.post('/api/admin/extract-words', upload.single('image'), async (req, res) =>
 // 2b. Extract words from pasted text
 app.post('/api/admin/extract-pasted-words', async (req, res) => {
   try {
-    const { text, category } = req.body;
+    const { text, category, tag } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ error: 'No text provided' });
     }
@@ -115,6 +133,7 @@ app.post('/api/admin/extract-pasted-words', async (req, res) => {
       const dbCheck = await db.query('SELECT id FROM words WHERE LOWER(word) = LOWER($1)', [w.word.trim()]);
       enrichedWords.push({
         ...w,
+        tag: tag || '',
         alreadyExists: dbCheck.rows.length > 0
       });
     }
@@ -156,8 +175,8 @@ app.post('/api/admin/save-words', async (req, res) => {
       await client.query(`
         INSERT INTO words (
           word, definition, sentence, category, part_of_speech, 
-          morphemes, alternate_pronunciations, spelling_tip
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          morphemes, alternate_pronunciations, spelling_tip, tag
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `, [
         cleanWord,
         w.definition,
@@ -166,7 +185,8 @@ app.post('/api/admin/save-words', async (req, res) => {
         w.part_of_speech,
         JSON.stringify(w.morphemes || []),
         w.alternate_pronunciations || [],
-        w.spelling_tip || ''
+        w.spelling_tip || '',
+        w.tag || ''
       ]);
       
       addedCount++;
@@ -186,7 +206,7 @@ app.post('/api/admin/save-words', async (req, res) => {
 // 4. Get all words with pagination and filters (Admin Dashboard list)
 app.get('/api/admin/words', async (req, res) => {
   try {
-    const { category, search, page = 1, limit = 50 } = req.query;
+    const { category, search, page = 1, limit = 50, tag } = req.query;
     const offset = (page - 1) * limit;
     
     let query = 'SELECT * FROM words WHERE 1=1';
@@ -196,6 +216,11 @@ app.get('/api/admin/words', async (req, res) => {
     if (category) {
       query += ` AND category = $${paramIndex++}`;
       params.push(category);
+    }
+    
+    if (tag) {
+      query += ` AND tag = $${paramIndex++}`;
+      params.push(tag);
     }
     
     if (search) {
@@ -241,14 +266,14 @@ app.delete('/api/admin/words/:id', async (req, res) => {
 app.put('/api/admin/words/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { word, definition, sentence, category, part_of_speech, morphemes, alternate_pronunciations, spelling_tip } = req.body;
+    const { word, definition, sentence, category, part_of_speech, morphemes, alternate_pronunciations, spelling_tip, tag } = req.body;
     
     await db.query(`
       UPDATE words SET 
         word = $1, definition = $2, sentence = $3, category = $4, 
         part_of_speech = $5, morphemes = $6, alternate_pronunciations = $7, 
-        spelling_tip = $8
-      WHERE id = $9
+        spelling_tip = $8, tag = $9
+      WHERE id = $10
     `, [
       word.trim(),
       definition,
@@ -258,6 +283,7 @@ app.put('/api/admin/words/:id', async (req, res) => {
       JSON.stringify(morphemes || []),
       alternate_pronunciations || [],
       spelling_tip || '',
+      tag || '',
       id
     ]);
     
@@ -271,7 +297,7 @@ app.put('/api/admin/words/:id', async (req, res) => {
 // 7. Get due review words or new words (Practice and Study mode)
 app.get('/api/words/due', async (req, res) => {
   try {
-    const { limit = 20, category, userId } = req.query;
+    const { limit = 20, category, userId, tag } = req.query;
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
@@ -290,8 +316,13 @@ app.get('/api/words/due', async (req, res) => {
     const params = [userId];
     
     if (category) {
-      query += ` AND w.category = $2`;
+      query += ` AND w.category = $${params.length + 1}`;
       params.push(category);
+    }
+    
+    if (tag) {
+      query += ` AND w.tag = $${params.length + 1}`;
+      params.push(tag);
     }
     
     query += ` ORDER BY COALESCE(p.box, 1) ASC, COALESCE(p.next_review_date, CURRENT_TIMESTAMP) ASC LIMIT $${params.length + 1}`;
@@ -308,7 +339,7 @@ app.get('/api/words/due', async (req, res) => {
 // 8. Get random words for testing modes (Standard Round or Speed Round)
 app.get('/api/words/random', async (req, res) => {
   try {
-    const { limit = 20, category, userId } = req.query;
+    const { limit = 20, category, userId, tag } = req.query;
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
@@ -327,8 +358,13 @@ app.get('/api/words/random', async (req, res) => {
     const params = [userId];
     
     if (category) {
-      query += ' AND w.category = $2';
+      query += ` AND w.category = $${params.length + 1}`;
       params.push(category);
+    }
+    
+    if (tag) {
+      query += ` AND w.tag = $${params.length + 1}`;
+      params.push(tag);
     }
     
     query += ` ORDER BY RANDOM() LIMIT $${params.length + 1}`;
@@ -354,7 +390,7 @@ function shuffleArray(array) {
 // 8.5 Get history of practiced words for this user
 app.get('/api/words/history', async (req, res) => {
   try {
-    const { userId, category, limit = 50, page = 1 } = req.query;
+    const { userId, category, limit = 50, page = 1, tag } = req.query;
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
@@ -377,6 +413,11 @@ app.get('/api/words/history', async (req, res) => {
     if (category) {
       query += ` AND w.category = $${paramIndex++}`;
       params.push(category);
+    }
+    
+    if (tag) {
+      query += ` AND w.tag = $${paramIndex++}`;
+      params.push(tag);
     }
     
     // Get total for pagination
@@ -404,7 +445,7 @@ app.get('/api/words/history', async (req, res) => {
 // 8.6 Get custom words query (random/sequential settings, categories filtering, history source option)
 app.get('/api/words/custom', async (req, res) => {
   try {
-    const { userId, source = 'all', category = 'all', orderWords = 'random', orderCategories = 'random', limit = 20 } = req.query;
+    const { userId, source = 'all', category = 'all', tag = 'all', orderWords = 'random', orderCategories = 'random', limit = 20 } = req.query;
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
@@ -448,8 +489,13 @@ app.get('/api/words/custom', async (req, res) => {
     }
     
     if (category && category !== 'all') {
-      query += ` AND w.category = $2`;
+      query += ` AND w.category = $${params.length + 1}`;
       params.push(category);
+    }
+    
+    if (tag && tag !== 'all') {
+      query += ` AND w.tag = $${params.length + 1}`;
+      params.push(tag);
     }
     
     const result = await db.query(query, params);

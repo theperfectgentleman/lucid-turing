@@ -28,6 +28,7 @@ const initDb = async () => {
         morphemes JSONB,
         alternate_pronunciations TEXT[],
         spelling_tip TEXT,
+        tag VARCHAR(100),
         
         -- Spaced Repetition (SRS) fields (SuperMemo-2 algorithm)
         box INTEGER DEFAULT 1,
@@ -40,6 +41,11 @@ const initDb = async () => {
         
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+    
+    // Ensure tag column exists in existing database deployments
+    await client.query(`
+      ALTER TABLE words ADD COLUMN IF NOT EXISTS tag VARCHAR(100);
     `);
     
     // Create index on word for fast lookups

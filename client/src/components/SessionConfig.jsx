@@ -3,11 +3,13 @@ import { Play, ArrowLeft, Loader, Settings, HelpCircle } from 'lucide-react';
 
 export default function SessionConfig({ mode, currentUser, setView, onStart }) {
   const [categories, setCategories] = useState([]);
+  const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Config states
   const [source, setSource] = useState(mode === 'study' ? 'srs' : 'all');
   const [category, setCategory] = useState('all');
+  const [tag, setTag] = useState('all');
   const [orderWords, setOrderWords] = useState('random');
   const [orderCategories, setOrderCategories] = useState('random');
   const [limit, setLimit] = useState(mode === 'speed' ? 50 : 20);
@@ -25,6 +27,12 @@ export default function SessionConfig({ mode, currentUser, setView, onStart }) {
         const data = await res.json();
         setCategories(data.categories || []);
       }
+      
+      const tagsRes = await fetch(`/api/words/tags`);
+      if (tagsRes.ok) {
+        const data = await tagsRes.json();
+        setTags(data.tags || []);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -40,6 +48,7 @@ export default function SessionConfig({ mode, currentUser, setView, onStart }) {
         userId: currentUser.id,
         source,
         category,
+        tag,
         orderWords,
         orderCategories,
         limit
@@ -114,6 +123,19 @@ export default function SessionConfig({ mode, currentUser, setView, onStart }) {
               {categories.map(cat => (
                 <option key={cat.category} value={cat.category}>
                   {cat.category} ({cat.count} words)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Target Booklet Group / Tag */}
+          <div className="form-group">
+            <label className="form-label">Booklet Group / Tag</label>
+            <select value={tag} onChange={(e) => setTag(e.target.value)} className="form-control">
+              <option value="all">All Groups / Tags Mixed</option>
+              {tags.map(t => (
+                <option key={t} value={t}>
+                  {t}
                 </option>
               ))}
             </select>

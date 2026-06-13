@@ -8,6 +8,7 @@ export default function AdminConfig({ setView }) {
   const [importMode, setImportMode] = useState('image'); // 'image' or 'paste'
   const [pastedText, setPastedText] = useState('');
   const [pasteCategory, setPasteCategory] = useState('Other');
+  const [uploadTag, setUploadTag] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -17,6 +18,8 @@ export default function AdminConfig({ setView }) {
 
   // Tab 2: Manage Words Database
   const [dbWords, setDbWords] = useState([]);
+  const [dbTags, setDbTags] = useState([]);
+  const [dbTag, setDbTag] = useState('');
   const [dbTotal, setDbTotal] = useState(0);
   const [dbPage, setDbPage] = useState(1);
   const [dbLimit] = useState(25);
@@ -37,11 +40,12 @@ export default function AdminConfig({ setView }) {
   useEffect(() => {
     if (activeTab === 'manage') {
       fetchDbWords();
+      fetchDbTags();
     }
     if (activeTab === 'users') {
       fetchUserProfiles();
     }
-  }, [activeTab, dbPage, dbCategory]);
+  }, [activeTab, dbPage, dbCategory, dbTag]);
 
   // Trigger search on debounce or submit
   const handleSearchSubmit = (e) => {
@@ -57,7 +61,8 @@ export default function AdminConfig({ setView }) {
         page: dbPage,
         limit: dbLimit,
         search: dbSearch,
-        category: dbCategory
+        category: dbCategory,
+        tag: dbTag
       });
       const res = await fetch(`/api/admin/words?${queryParams}`);
       if (!res.ok) throw new Error('Failed to fetch words');
@@ -68,6 +73,18 @@ export default function AdminConfig({ setView }) {
       console.error(e);
     } finally {
       setDbLoading(false);
+    }
+  };
+
+  const fetchDbTags = async () => {
+    try {
+      const res = await fetch('/api/words/tags');
+      if (res.ok) {
+        const data = await res.json();
+        setDbTags(data.tags || []);
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -166,6 +183,7 @@ export default function AdminConfig({ setView }) {
       
       const formData = new FormData();
       formData.append('image', selectedFile);
+      formData.append('tag', uploadTag);
       
       const res = await fetch('/api/admin/extract-words', {
         method: 'POST',
@@ -206,7 +224,7 @@ export default function AdminConfig({ setView }) {
       const res = await fetch('/api/admin/extract-pasted-words', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: pastedText, category: pasteCategory })
+        body: JSON.stringify({ text: pastedText, category: pasteCategory, tag: uploadTag })
       });
       
       if (!res.ok) {
@@ -392,6 +410,17 @@ export default function AdminConfig({ setView }) {
               {importMode === 'image' ? (
                 <div>
                   <h3 style={{ fontSize: '16px', marginBottom: '16px' }}>Select Booklet Page Image</h3>
+                  <div className="form-group" style={{ marginBottom: '16px' }}>
+                    <label className="form-label" style={{ fontSize: '12px', fontWeight: '500' }}>Booklet Tag / Group</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Group 6" 
+                      value={uploadTag} 
+                      onChange={(e) => setUploadTag(e.target.value)} 
+                      className="form-control" 
+                      style={{ fontSize: '13px' }}
+                    />
+                  </div>
                   <div 
                     className="upload-zone"
                     onDragOver={handleDragOver}
@@ -478,6 +507,20 @@ export default function AdminConfig({ setView }) {
                         style={{ fontSize: '13px' }}
                       />
                     )}
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ fontSize: '12px', marginBottom: '4px', display: 'block', fontWeight: '500' }}>
+                      Booklet Tag / Group
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Group 6" 
+                      value={uploadTag} 
+                      onChange={(e) => setUploadTag(e.target.value)} 
+                      className="form-control" 
+                      style={{ fontSize: '13px' }}
+                    />
                   </div>
 
                   <button 
@@ -578,13 +621,23 @@ export default function AdminConfig({ setView }) {
                       </div>
 
                       {wordData.selected && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px', paddingLeft: '30px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '8px', paddingLeft: '30px' }}>
                           <div>
                             <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Language of Origin (Category)</label>
                             <input 
                               type="text" 
                               value={wordData.category} 
                               onChange={(e) => handleExtractedWordChange(idx, 'category', e.target.value)}
+                              className="form-control" 
+                              style={{ padding: '6px 10px', fontSize: '13px' }}
+                            />
+                          </div>
+                          <div>
+                            <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Booklet Tag / Group</label>
+                            <input 
+                              type="text" 
+                              value={wordData.tag || ''} 
+                              onChange={(e) => handleExtractedWordChange(idx, 'tag', e.target.value)}
                               className="form-control" 
                               style={{ padding: '6px 10px', fontSize: '13px' }}
                             />
@@ -599,7 +652,7 @@ export default function AdminConfig({ setView }) {
                               style={{ padding: '6px 10px', fontSize: '13px' }}
                             />
                           </div>
-                          <div style={{ gridColumn: 'span 2' }}>
+                          <div style={{ gridColumn: 'span 3' }}>
                             <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Definition</label>
                             <input 
                               type="text" 
@@ -609,7 +662,7 @@ export default function AdminConfig({ setView }) {
                               style={{ padding: '6px 10px', fontSize: '13px' }}
                             />
                           </div>
-                          <div style={{ gridColumn: 'span 2' }}>
+                          <div style={{ gridColumn: 'span 3' }}>
                             <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Context Sentence</label>
                             <input 
                               type="text" 
@@ -619,7 +672,7 @@ export default function AdminConfig({ setView }) {
                               style={{ padding: '6px 10px', fontSize: '13px' }}
                             />
                           </div>
-                          <div style={{ gridColumn: 'span 2' }}>
+                          <div style={{ gridColumn: 'span 3' }}>
                             <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Spelling Tip</label>
                             <input 
                               type="text" 
@@ -647,7 +700,7 @@ export default function AdminConfig({ setView }) {
             <h3 style={{ fontSize: '18px' }}>Database Words Inventory</h3>
             
             {/* Search and Filters */}
-            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flexGrow: '1', maxWidth: '500px' }}>
+            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flexGrow: '1', maxWidth: '600px' }}>
               <div style={{ position: 'relative', flexGrow: '1' }}>
                 <input 
                   type="text" 
@@ -663,7 +716,7 @@ export default function AdminConfig({ setView }) {
                 value={dbCategory} 
                 onChange={(e) => { setDbCategory(e.target.value); setDbPage(1); }}
                 className="form-control"
-                style={{ width: '160px' }}
+                style={{ width: '130px' }}
               >
                 <option value="">All Origins</option>
                 <option value="Afrikaans">Afrikaans</option>
@@ -674,6 +727,17 @@ export default function AdminConfig({ setView }) {
                 <option value="Dutch">Dutch</option>
                 <option value="Italian">Italian</option>
                 <option value="Other">Other</option>
+              </select>
+              <select 
+                value={dbTag} 
+                onChange={(e) => { setDbTag(e.target.value); setDbPage(1); }}
+                className="form-control"
+                style={{ width: '120px' }}
+              >
+                <option value="">All Tags</option>
+                {dbTags.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
               </select>
               <button type="submit" className="btn btn-secondary">
                 Search
@@ -698,6 +762,7 @@ export default function AdminConfig({ setView }) {
                     <tr>
                       <th>Word</th>
                       <th>Origin</th>
+                      <th>Tag</th>
                       <th>Part of Speech</th>
                       <th>Definition</th>
                       <th>SRS Box</th>
@@ -712,6 +777,13 @@ export default function AdminConfig({ setView }) {
                           <span className="origin-badge" style={{ fontSize: '12px', padding: '3px 8px' }}>
                             {w.category}
                           </span>
+                        </td>
+                        <td>
+                          {w.tag && (
+                            <span className="origin-badge" style={{ fontSize: '12px', padding: '3px 8px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
+                              {w.tag}
+                            </span>
+                          )}
                         </td>
                         <td style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}>{w.part_of_speech}</td>
                         <td style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-secondary)' }}>
@@ -854,13 +926,22 @@ export default function AdminConfig({ setView }) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Language of Origin (Category)</label>
                   <input 
                     type="text" 
                     value={editingWord.category} 
                     onChange={(e) => setEditingWord({ ...editingWord, category: e.target.value })} 
+                    className="form-control" 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Booklet Tag / Group</label>
+                  <input 
+                    type="text" 
+                    value={editingWord.tag || ''} 
+                    onChange={(e) => setEditingWord({ ...editingWord, tag: e.target.value })} 
                     className="form-control" 
                   />
                 </div>

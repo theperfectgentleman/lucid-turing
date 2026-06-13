@@ -83,6 +83,7 @@ export default function HistoryView({ setView, currentUser, startCustomSession }
                   <tr>
                     <th>Word</th>
                     <th>Origin</th>
+                    <th>Tag</th>
                     <th>Part of Speech</th>
                     <th>Box Level</th>
                     <th>Attempts</th>
@@ -100,6 +101,15 @@ export default function HistoryView({ setView, currentUser, startCustomSession }
                           <span className="origin-badge" style={{ fontSize: '12px', padding: '3px 8px' }}>
                             {w.category}
                           </span>
+                        </td>
+                        <td>
+                          {w.tag ? (
+                            <span className="origin-badge" style={{ fontSize: '12px', padding: '3px 8px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
+                              {w.tag}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
+                          )}
                         </td>
                         <td style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}>{w.part_of_speech}</td>
                         <td>
