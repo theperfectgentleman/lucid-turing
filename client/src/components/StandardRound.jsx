@@ -404,7 +404,7 @@ export default function StandardRound({ setView, currentUser, customWords }) {
             <HelpCircle size={14} /> Lifelines (Rule 9 allowed requests)
           </h4>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '16px' }}>
+          <div className="lifelines-grid">
             <button type="button" className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: '13px' }} onClick={() => requestHint('def')} disabled={showDefinition}>
               1. Definition
             </button>

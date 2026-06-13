@@ -6,7 +6,7 @@ import SpeedRound from './components/SpeedRound'
 import AdminConfig from './components/AdminConfig'
 import HistoryView from './components/HistoryView'
 import SessionConfig from './components/SessionConfig'
-import { LayoutGrid, Brain, Zap, Settings, Award, LogOut, Lock, User, Clock } from 'lucide-react'
+import { LayoutGrid, Brain, Zap, Settings, Award, LogOut, Lock, User, Clock, Sun, Moon, Menu, X } from 'lucide-react'
 import './App.css'
 
 function App() {
@@ -15,6 +15,25 @@ function App() {
   const [profiles, setProfiles] = useState([])
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [pinInput, setPinInput] = useState('')
+  
+  // Theme state
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('bee_speller_theme') || 'dark';
+  });
+
+  useEffect(() => {
+    if (theme === 'light') {
+      document.body.classList.add('light-theme');
+    } else {
+      document.body.classList.remove('light-theme');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('bee_speller_theme', newTheme);
+  };
   
   // Custom Session Config States
   const [customWords, setCustomWords] = useState(null)
@@ -27,6 +46,7 @@ function App() {
   const [authError, setAuthError] = useState('')
   
   const [view, setView] = useState('dashboard')
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // Fetch profiles on load for student select
   useEffect(() => {
@@ -253,9 +273,23 @@ function App() {
   return (
     <>
       <header className="navbar">
-        <a href="#" className="logo" onClick={() => setView('dashboard')}>
+        <a href="#" className="logo" onClick={() => { setView('dashboard'); setIsMobileMenuOpen(false); }}>
           🐝 <span>BeeSpeller</span> AI
         </a>
+        
+        {/* Mobile Menu Toggle Button */}
+        {authState !== 'logged-out' && (
+          <button 
+            className="menu-toggle nav-button" 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            title="Toggle Menu"
+            style={{ padding: '8px', display: 'none' }}
+          >
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        )}
+
+        {/* Desktop Navigation */}
         <nav className="nav-links">
           {authState === 'student' && (
             <>
@@ -301,6 +335,14 @@ function App() {
           )}
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '16px' }}>
+            <button 
+              className="nav-button" 
+              style={{ padding: '6px', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+              onClick={toggleTheme} 
+              title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>
               {authState === 'admin' ? '👑 Admin' : `👤 ${currentUser?.name}`}
             </span>
@@ -310,6 +352,79 @@ function App() {
           </div>
         </nav>
       </header>
+
+      {/* Mobile Navigation Dropdown Overlay */}
+      {isMobileMenuOpen && authState !== 'logged-out' && (
+        <div className="mobile-nav-overlay" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="mobile-nav-menu" onClick={(e) => e.stopPropagation()}>
+            {authState === 'student' && (
+              <>
+                <button 
+                  className={`mobile-nav-item ${view === 'dashboard' ? 'active' : ''}`} 
+                  onClick={() => { setView('dashboard'); setIsMobileMenuOpen(false); }}
+                >
+                  <LayoutGrid size={18} /> Dashboard
+                </button>
+                <button 
+                  className={`mobile-nav-item ${view === 'study' || (view === 'config' && activeConfigMode === 'study') ? 'active' : ''}`} 
+                  onClick={() => { setActiveConfigMode('study'); setView('config'); setIsMobileMenuOpen(false); }}
+                >
+                  <Brain size={18} /> Study
+                </button>
+                <button 
+                  className={`mobile-nav-item ${view === 'standard' || (view === 'config' && activeConfigMode === 'standard') ? 'active' : ''}`} 
+                  onClick={() => { setActiveConfigMode('standard'); setView('config'); setIsMobileMenuOpen(false); }}
+                >
+                  <Award size={18} /> Standard Round
+                </button>
+                <button 
+                  className={`mobile-nav-item ${view === 'speed' || (view === 'config' && activeConfigMode === 'speed') ? 'active' : ''}`} 
+                  onClick={() => { setActiveConfigMode('speed'); setView('config'); setIsMobileMenuOpen(false); }}
+                >
+                  <Zap size={18} /> Speed Round
+                </button>
+                <button 
+                  className={`mobile-nav-item ${view === 'history' ? 'active' : ''}`} 
+                  onClick={() => { setView('history'); setIsMobileMenuOpen(false); }}
+                >
+                  <Clock size={18} /> History
+                </button>
+              </>
+            )}
+            {authState === 'admin' && (
+              <button 
+                className={`mobile-nav-item ${view === 'admin' ? 'active' : ''}`} 
+                onClick={() => { setView('admin'); setIsMobileMenuOpen(false); }}
+              >
+                <Settings size={18} /> Admin Config
+              </button>
+            )}
+            
+            <div className="mobile-nav-divider"></div>
+            
+            <div className="mobile-nav-footer">
+              <button 
+                className="nav-button" 
+                style={{ padding: '8px', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)' }} 
+                onClick={toggleTheme} 
+                title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              >
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <span style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '600', flexGrow: 1, textAlign: 'center' }}>
+                {authState === 'admin' ? '👑 Admin' : `👤 ${currentUser?.name}`}
+              </span>
+              <button 
+                className="btn btn-danger" 
+                style={{ padding: '8px 12px', fontSize: '13px' }} 
+                onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
+              >
+                <LogOut size={14} /> Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="app-container">
         {view === 'dashboard' && authState === 'student' && (

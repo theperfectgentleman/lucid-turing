@@ -159,7 +159,7 @@ export default function Dashboard({ setView, currentUser }) {
       </div>
 
       {/* Progress Metrics & Origin Breakdown */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
         {/* SRS Boxes Progress */}
         <div className="card">
           <h3 style={{ fontSize: '18px', marginBottom: '20px' }}>SRS Learning Progress</h3>

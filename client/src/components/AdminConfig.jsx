@@ -429,7 +429,7 @@ export default function AdminConfig({ setView }) {
       {/* TAB 1: UPLOAD AND EXTRACT */}
       {activeTab === 'upload' && (
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: (importMode === 'paste' || previewUrl) ? '320px 1fr' : '1fr', gap: '24px', alignItems: 'start' }}>
+          <div className={`admin-split-grid ${(importMode === 'paste' || previewUrl) ? '' : 'single-col'}`}>
             
             {/* Upload Area / Paste Area */}
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -672,7 +672,7 @@ export default function AdminConfig({ setView }) {
                       </div>
 
                       {wordData.selected && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '8px', paddingLeft: '30px' }}>
+                        <div className="extracted-word-fields">
                           <div>
                             <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Language of Origin (Category)</label>
                             <input 
@@ -751,7 +751,7 @@ export default function AdminConfig({ setView }) {
             <h3 style={{ fontSize: '18px' }}>Database Words Inventory</h3>
             
             {/* Search and Filters */}
-            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flexGrow: '1', maxWidth: '600px' }}>
+            <form onSubmit={handleSearchSubmit} className="admin-search-form">
               <div style={{ position: 'relative', flexGrow: '1' }}>
                 <input 
                   type="text" 

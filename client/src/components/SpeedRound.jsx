@@ -220,7 +220,7 @@ export default function SpeedRound({ setView, currentUser, customWords }) {
             Time ran out. Here is your spelling performance:
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+          <div className="stats-grid-3col">
             <div className="card" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Attempted</div>
               <div style={{ fontSize: '28px', fontWeight: '800' }}>{attemptsCount}</div>

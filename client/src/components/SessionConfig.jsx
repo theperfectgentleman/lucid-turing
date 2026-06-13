@@ -150,7 +150,7 @@ export default function SessionConfig({ mode, currentUser, setView, onStart }) {
           </div>
 
           {/* Randomness & Ordering Options */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="config-grid">
             <div className="form-group">
               <label className="form-label">Word Order (Inside Section)</label>
               <select value={orderWords} onChange={(e) => setOrderWords(e.target.value)} className="form-control">
