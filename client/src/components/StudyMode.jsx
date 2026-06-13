@@ -6,18 +6,27 @@ export default function StudyMode({ setView, currentUser, customWords }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   
+  // Card flip state
+  const [isFlipped, setIsFlipped] = useState(false);
+  
   // Spell checking state
   const [inputSpelling, setInputSpelling] = useState('');
   const [isChecked, setIsChecked] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
-  
-  // Hints state
-  const [showDefinition, setShowDefinition] = useState(false);
-  const [showSentence, setShowSentence] = useState(false);
-  const [showPOS, setShowPOS] = useState(false);
-  const [showLego, setShowLego] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(false);
   
+  const [audioSource, setAudioSource] = useState(() => {
+    return localStorage.getItem('bee_speller_audio_source') || 'ai';
+  });
+
+  const changeAudioSource = (newSource) => {
+    setAudioSource(newSource);
+    localStorage.setItem('bee_speller_audio_source', newSource);
+    if (words[currentIndex]) {
+      speakWordWithSource(words[currentIndex].word, newSource);
+    }
+  };
+
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -53,30 +62,47 @@ export default function StudyMode({ setView, currentUser, customWords }) {
       setInputSpelling('');
       setIsChecked(false);
       setIsCorrect(false);
-      // Reset hints
-      setShowDefinition(false);
-      setShowSentence(false);
-      setShowPOS(false);
-      setShowLego(false);
       setHintsUsed(false);
-      
-      // Focus input field
-      setTimeout(() => {
-        if (inputRef.current) inputRef.current.focus();
-      }, 300);
+      setIsFlipped(false); // Start on study front card
     }
   }, [currentIndex, words]);
 
   const speakWord = (wordText) => {
+    speakWordWithSource(wordText, audioSource);
+  };
+
+  const speakWordWithSource = async (wordText, source) => {
+    if (source === 'ai') {
+      try {
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(wordText.toLowerCase())}`);
+        if (res.ok) {
+          const data = await res.json();
+          const phonetic = data[0]?.phonetics?.find(p => p.audio && p.audio.trim() !== '');
+          if (phonetic && phonetic.audio) {
+            let audioUrl = phonetic.audio;
+            if (audioUrl.startsWith('//')) {
+              audioUrl = 'https:' + audioUrl;
+            }
+            const audio = new Audio(audioUrl);
+            await audio.play();
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('AI Pronunciation failed, falling back to System TTS:', err);
+      }
+    }
+    
+    speakSystemTTS(wordText);
+  };
+
+  const speakSystemTTS = (wordText) => {
     if ('speechSynthesis' in window) {
-      // Cancel any ongoing speech
       window.speechSynthesis.cancel();
-      
       const utterance = new SpeechSynthesisUtterance(wordText);
       utterance.rate = 0.85; // Speak slightly slower for spelling clarity
       utterance.pitch = 1;
       
-      // Try to find a high quality English voice (preferably UK or US)
       const voices = window.speechSynthesis.getVoices();
       const englishVoice = voices.find(voice => 
         voice.lang.startsWith('en-US') || voice.lang.startsWith('en-GB')
@@ -85,7 +111,7 @@ export default function StudyMode({ setView, currentUser, customWords }) {
       
       window.speechSynthesis.speak(utterance);
     } else {
-      alert("Text-to-speech is not supported on this browser.");
+      console.warn("Text-to-speech is not supported on this browser.");
     }
   };
 
@@ -100,10 +126,6 @@ export default function StudyMode({ setView, currentUser, customWords }) {
     setIsCorrect(match);
     setIsChecked(true);
 
-    // Determine quality rating for SuperMemo-2
-    // 5 = Perfect, no hints
-    // 3 = Correct, with hints
-    // 1 = Incorrect
     let quality = 1;
     if (match) {
       quality = hintsUsed ? 3 : 5;
@@ -111,14 +133,12 @@ export default function StudyMode({ setView, currentUser, customWords }) {
       quality = 1;
     }
 
-    // Speak result
     if (match) {
       speakWord("Correct!");
     } else {
       speakWord(`Incorrect. The correct spelling is ${currentWord.word}`);
     }
 
-    // Save progress to database
     try {
       await fetch(`/api/words/${currentWord.id}/review`, {
         method: 'POST',
@@ -136,20 +156,8 @@ export default function StudyMode({ setView, currentUser, customWords }) {
     if (currentIndex < words.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
-      // Out of words
       setWords([]);
       setCurrentIndex(0);
-    }
-  };
-
-  const activateHint = (hintType) => {
-    setHintsUsed(true);
-    if (hintType === 'def') setShowDefinition(true);
-    if (hintType === 'sent') setShowSentence(true);
-    if (hintType === 'pos') setShowPOS(true);
-    if (hintType === 'lego') {
-      setShowLego(true);
-      // If we show Lego hint, auto reveal origin and tip
     }
   };
 
@@ -161,7 +169,6 @@ export default function StudyMode({ setView, currentUser, customWords }) {
     );
   }
 
-  // Completed study session or no words
   if (words.length === 0) {
     return (
       <div className="practice-container card" style={{ padding: '48px', maxWidth: '600px' }}>
@@ -182,8 +189,7 @@ export default function StudyMode({ setView, currentUser, customWords }) {
     );
   }
 
-  // Progress percentage
-  const progressPct = ((currentIndex) / words.length) * 100;
+  const progressPct = (currentIndex / words.length) * 100;
 
   return (
     <div className="practice-container">
@@ -202,157 +208,301 @@ export default function StudyMode({ setView, currentUser, customWords }) {
       </div>
 
       {/* Main card */}
-      <div className="card" style={{ padding: '32px', position: 'relative' }}>
-        {/* Box label */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <div className="card" style={{ padding: '32px', position: 'relative', minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        
+        {/* Card Header (Category, Box Level, Mode indicator) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
           <span className="origin-badge">
-            🌍 {currentWord.category || 'Other'}
+            🌍 {currentWord.category || 'Other'} {currentWord.tag ? `• ${currentWord.tag}` : ''}
           </span>
           <span className="origin-badge" style={{ borderColor: 'rgba(234, 179, 8, 0.2)', color: 'var(--accent)' }}>
-            <Layers size={13} style={{ marginRight: '4px' }} /> Box {currentWord.box}
+            <Layers size={13} style={{ marginRight: '4px' }} /> Box {currentWord.box} ({!isFlipped ? 'STUDY CARD' : 'TEST CARD'})
           </span>
         </div>
 
-        {/* Audio Button */}
-        <div className="word-player-container">
-          <button className="audio-btn" onClick={() => speakWord(currentWord.word)} title="Listen to word">
-            <Volume2 size={36} />
-          </button>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Click to play spelling pronunciation</p>
-        </div>
-
-        {/* Form Input */}
-        <form onSubmit={handleCheck}>
-          <input
-            ref={inputRef}
-            type="text"
-            className={`spelling-input ${isChecked ? (isCorrect ? 'correct' : 'incorrect') : ''}`}
-            placeholder="Type your spelling here"
-            value={inputSpelling}
-            onChange={(e) => setInputSpelling(e.target.value)}
-            disabled={isChecked}
-            autoCapitalize="off"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck="false"
-          />
-
-          {!isChecked ? (
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', maxWidth: '300px', display: 'block', margin: '0 auto 24px' }}>
-              Check Spelling
-            </button>
-          ) : (
-            <button type="button" className="btn btn-accent" style={{ width: '100%', maxWidth: '300px', display: 'block', margin: '0 auto 24px' }} onClick={handleNext}>
-              Next Word <ChevronRight size={18} />
-            </button>
-          )}
-        </form>
-
-        {/* Post-Check Answer reveals */}
-        {isChecked && (
-          <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)' }}>
-            {isCorrect ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--success)', fontWeight: '700', fontSize: '20px' }}>
-                <Check size={24} /> Perfect! Correct Spelling.
-              </div>
-            ) : (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--error)', fontWeight: '700', fontSize: '20px', marginBottom: '8px' }}>
-                  <X size={24} /> Incorrect Spelling.
+        {/* Card Body */}
+        <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {!isFlipped ? (
+            /* FRONT: Study/Learning view */
+            <div>
+              {/* Lego Blocks (Syllable Breakdown) - Primary Visual for Learning */}
+              <div style={{ 
+                background: 'rgba(0, 0, 0, 0.2)', 
+                padding: '24px', 
+                borderRadius: 'var(--radius-md)', 
+                border: '1px solid var(--border-color)', 
+                marginBottom: '24px' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                        Lego Blocks (Syllable Breakdown)
+                      </h2>
+                      <select 
+                        value={audioSource} 
+                        onChange={(e) => changeAudioSource(e.target.value)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          color: 'var(--text-secondary)',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="ai" style={{ background: '#0b0f19' }}>🔊 AI Voice</option>
+                        <option value="system" style={{ background: '#0b0f19' }}>🎙️ System TTS</option>
+                      </select>
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', marginBottom: 0 }}>
+                      Words are built from blocks. Learn the block structure to make spelling easier:
+                    </p>
+                  </div>
+                  <button 
+                    className="audio-btn" 
+                    onClick={() => speakWord(currentWord.word)} 
+                    title="Listen to word"
+                    style={{ 
+                      width: '56px', 
+                      height: '56px', 
+                      padding: '0', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      borderRadius: '50%',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Volume2 size={26} />
+                  </button>
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)' }}>
-                  Correct: <span style={{ color: 'var(--success)' }}>{currentWord.word}</span>
-                </div>
-                <div style={{ fontSize: '16px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                  Your spelling: <span style={{ color: 'var(--error)', textDecoration: 'line-through' }}>{inputSpelling}</span>
-                </div>
-              </div>
-            )}
-            
-            {/* Spelling Tip */}
-            {currentWord.spelling_tip && (
-              <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', fontSize: '14px', textAlign: 'left', color: 'var(--accent)' }}>
-                💡 <strong>Spelling Rule:</strong> {currentWord.spelling_tip}
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* Hints Section */}
-        <div className="hints-container">
-          <h4 style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <HelpCircle size={14} /> Lifelines & Hints (Using hints caps score for this card)
-          </h4>
-
-          {/* Definition Hint */}
-          <div className="hint-item">
-            <div className="hint-header" onClick={() => !showDefinition && activateHint('def')}>
-              <span>Definition</span>
-              <span>{!showDefinition && "Reveal"}</span>
-            </div>
-            {showDefinition && (
-              <div className="hint-content">
-                <strong>[{currentWord.part_of_speech}]</strong>: {currentWord.definition}
-              </div>
-            )}
-          </div>
-
-          {/* Sentence Hint */}
-          <div className="hint-item">
-            <div className="hint-header" onClick={() => !showSentence && activateHint('sent')}>
-              <span>Sentence Example</span>
-              <span>{!showSentence && "Reveal"}</span>
-            </div>
-            {showSentence && (
-              <div className="hint-content" style={{ fontStyle: 'italic' }}>
-                "{currentWord.sentence}"
-              </div>
-            )}
-          </div>
-
-          {/* Part of Speech Hint */}
-          <div className="hint-item">
-            <div className="hint-header" onClick={() => !showPOS && activateHint('pos')}>
-              <span>Part of Speech</span>
-              <span>{!showPOS && "Reveal"}</span>
-            </div>
-            {showPOS && (
-              <div className="hint-content">
-                This word is a <strong>{currentWord.part_of_speech}</strong>.
-              </div>
-            )}
-          </div>
-
-          {/* Lego Blocks (Morphological Breakdown) Hint */}
-          <div className="hint-item">
-            <div className="hint-header" onClick={() => !showLego && activateHint('lego')}>
-              <span>Lego Blocks (Syllable Breakdown)</span>
-              <span>{!showLego && "Reveal"}</span>
-            </div>
-            {(showLego || (isChecked && !isCorrect)) && (
-              <div className="hint-content" style={{ background: 'rgba(0,0,0,0.2)' }}>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  Words are built from blocks. Learn the block structure to make spelling easier:
-                </p>
-                <div className="lego-container">
+                <div className="lego-container" style={{ justifyContent: 'center', margin: '20px 0 8px', gap: '12px' }}>
                   {currentWord.morphemes && currentWord.morphemes.length > 0 ? (
                     currentWord.morphemes.map((m, idx) => (
-                      <div key={idx} className={`lego-block ${m.type || 'syllable'}`}>
-                        {m.text}
+                      <div 
+                        key={idx} 
+                        className={`lego-block ${m.type || 'syllable'}`}
+                        style={{
+                          padding: '16px 24px',
+                          fontSize: '24px',
+                          borderRadius: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minWidth: '90px'
+                        }}
+                      >
+                        <span style={{ fontWeight: '800', letterSpacing: '0.5px' }}>{m.text}</span>
                         {m.meaning && (
-                          <span className="lego-block-meaning">({m.meaning})</span>
+                          <span className="lego-block-meaning" style={{ fontSize: '11px', marginTop: '4px', opacity: 0.9 }}>
+                            ({m.meaning})
+                          </span>
                         )}
                       </div>
                     ))
                   ) : (
-                    <div className="lego-block syllable">
+                    <div 
+                      className="lego-block syllable"
+                      style={{
+                        padding: '16px 24px',
+                        fontSize: '24px',
+                        borderRadius: '12px',
+                        fontWeight: '800'
+                      }}
+                    >
                       {currentWord.word}
                     </div>
                   )}
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Study Clues */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left', marginBottom: '32px' }}>
+                {/* Definition */}
+                <div style={{ borderLeft: '3px solid var(--primary-hover)', paddingLeft: '12px' }}>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 'bold', display: 'block', marginBottom: '2px', letterSpacing: '0.5px' }}>
+                    Definition ({currentWord.part_of_speech})
+                  </span>
+                  <p style={{ fontSize: '16px', margin: 0, color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                    {currentWord.definition}
+                  </p>
+                </div>
+
+                {/* Example Sentence */}
+                {currentWord.sentence && (
+                  <div style={{ borderLeft: '3px solid var(--accent)', paddingLeft: '12px' }}>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 'bold', display: 'block', marginBottom: '2px', letterSpacing: '0.5px' }}>
+                      Example Sentence
+                    </span>
+                    <p style={{ fontSize: '15px', fontStyle: 'italic', margin: 0, color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      "{currentWord.sentence}"
+                    </p>
+                  </div>
+                )}
+
+                {/* Spelling Tip */}
+                {currentWord.spelling_tip && (
+                  <div style={{ borderLeft: '3px solid var(--success)', paddingLeft: '12px' }}>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 'bold', display: 'block', marginBottom: '2px', letterSpacing: '0.5px' }}>
+                      Spelling Rule / Tip
+                    </span>
+                    <p style={{ fontSize: '14px', margin: 0, color: 'var(--accent)', lineHeight: '1.4' }}>
+                      💡 {currentWord.spelling_tip}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Button */}
+              <button 
+                className="btn btn-accent" 
+                style={{ width: '100%', maxWidth: '300px', display: 'block', margin: '0 auto', fontSize: '16px', fontWeight: 'bold', padding: '12px 24px' }}
+                onClick={() => {
+                  setIsFlipped(true);
+                  setTimeout(() => {
+                    if (inputRef.current) inputRef.current.focus();
+                  }, 150);
+                }}
+              >
+                Test Spelling (Flip Card)
+              </button>
+            </div>
+          ) : (
+            /* BACK: Typing / Spelling test view */
+            <div>
+              {/* Speaker Pronunciation */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button 
+                    className="audio-btn" 
+                    onClick={() => speakWord(currentWord.word)} 
+                    title="Listen to word" 
+                    style={{ width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Volume2 size={28} />
+                  </button>
+                  <select 
+                    value={audioSource} 
+                    onChange={(e) => changeAudioSource(e.target.value)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      color: 'var(--text-secondary)',
+                      padding: '6px 12px',
+                      fontSize: '13px',
+                      outline: 'none',
+                      cursor: 'pointer',
+                      height: '36px'
+                    }}
+                  >
+                    <option value="ai" style={{ background: '#0b0f19' }}>🔊 AI Voice</option>
+                    <option value="system" style={{ background: '#0b0f19' }}>🎙️ System TTS</option>
+                  </select>
+                </div>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '500', margin: 0 }}>Tap to play spelling pronunciation</p>
+              </div>
+
+              {/* Typing Input */}
+              <form onSubmit={handleCheck} style={{ width: '100%', maxWidth: '400px', margin: '0 auto' }}>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  className={`spelling-input ${isChecked ? (isCorrect ? 'correct' : 'incorrect') : ''}`}
+                  placeholder="Type your spelling here"
+                  value={inputSpelling}
+                  onChange={(e) => setInputSpelling(e.target.value)}
+                  disabled={isChecked}
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck="false"
+                  style={{ fontSize: '24px', textAlign: 'center', padding: '12px', marginBottom: '20px', letterSpacing: '0.5px' }}
+                />
+
+                {!isChecked ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '10px' }} disabled={!inputSpelling.trim()}>
+                      Check Spelling
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary" 
+                      style={{ width: '100%', padding: '10px' }}
+                      onClick={() => {
+                        setHintsUsed(true);
+                        setIsFlipped(false);
+                      }}
+                    >
+                      ← Flip back to Study
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" className="btn btn-accent" style={{ width: '100%', display: 'block', margin: '0 auto', padding: '10px' }} onClick={handleNext}>
+                    Next Word <ChevronRight size={18} />
+                  </button>
+                )}
+              </form>
+
+              {/* Answers & Reviews */}
+              {isChecked && (
+                <div style={{ marginTop: '32px', padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)', textAlign: 'left', border: '1px solid var(--border-color)' }}>
+                  {isCorrect ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success)', fontWeight: '700', fontSize: '20px', marginBottom: '16px' }}>
+                      <Check size={24} /> Perfect! Correct Spelling.
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--error)', fontWeight: '700', fontSize: '20px', marginBottom: '12px' }}>
+                        <X size={24} /> Incorrect Spelling.
+                      </div>
+                      <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                        Correct: <span style={{ color: 'var(--success)' }}>{currentWord.word}</span>
+                      </div>
+                      <div style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>
+                        Your spelling: <span style={{ color: 'var(--error)', textDecoration: 'line-through' }}>{inputSpelling}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Lego Blocks review */}
+                  <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>
+                      🧩 Word Structure Breakdown:
+                    </p>
+                    <div className="lego-container" style={{ justifyContent: 'flex-start', margin: '8px 0 0' }}>
+                      {currentWord.morphemes && currentWord.morphemes.length > 0 ? (
+                        currentWord.morphemes.map((m, idx) => (
+                          <div key={idx} className={`lego-block ${m.type || 'syllable'}`}>
+                            {m.text}
+                            {m.meaning && (
+                              <span className="lego-block-meaning">({m.meaning})</span>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="lego-block syllable">
+                          {currentWord.word}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Spelling Tip */}
+                  {currentWord.spelling_tip && (
+                    <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', fontSize: '14px', color: 'var(--accent)', lineHeight: '1.4' }}>
+                      💡 <strong>Spelling Rule:</strong> {currentWord.spelling_tip}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

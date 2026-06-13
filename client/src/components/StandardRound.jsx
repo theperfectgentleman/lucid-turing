@@ -87,7 +87,48 @@ export default function StandardRound({ setView, currentUser, customWords }) {
     }
   }, [currentIndex, words]);
 
+  const [audioSource, setAudioSource] = useState(() => {
+    return localStorage.getItem('bee_speller_audio_source') || 'ai';
+  });
+
+  const changeAudioSource = (newSource) => {
+    setAudioSource(newSource);
+    localStorage.setItem('bee_speller_audio_source', newSource);
+    if (words[currentIndex]) {
+      speakWordWithSource(words[currentIndex].word, newSource);
+    }
+  };
+
   const speakWord = (wordText) => {
+    speakWordWithSource(wordText, audioSource);
+  };
+
+  const speakWordWithSource = async (wordText, source) => {
+    if (source === 'ai') {
+      try {
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(wordText.toLowerCase())}`);
+        if (res.ok) {
+          const data = await res.json();
+          const phonetic = data[0]?.phonetics?.find(p => p.audio && p.audio.trim() !== '');
+          if (phonetic && phonetic.audio) {
+            let audioUrl = phonetic.audio;
+            if (audioUrl.startsWith('//')) {
+              audioUrl = 'https:' + audioUrl;
+            }
+            const audio = new Audio(audioUrl);
+            await audio.play();
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('AI Pronunciation failed, falling back to System TTS:', err);
+      }
+    }
+    
+    speakSystemTTS(wordText);
+  };
+
+  const speakSystemTTS = (wordText) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(wordText);
@@ -274,12 +315,32 @@ export default function StandardRound({ setView, currentUser, customWords }) {
           </div>
         </div>
 
-        {/* Audio Button */}
-        <div className="word-player-container">
-          <button className="audio-btn" onClick={() => speakWord(currentWord.word)} title="Listen to word">
-            <Volume2 size={36} />
-          </button>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Click to play spelling pronunciation</p>
+        {/* Audio Button & Source Selector */}
+        <div className="word-player-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', margin: '24px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button className="audio-btn" onClick={() => speakWord(currentWord.word)} title="Listen to word" style={{ width: '64px', height: '64px', borderRadius: '50%' }}>
+              <Volume2 size={28} />
+            </button>
+            <select 
+              value={audioSource} 
+              onChange={(e) => changeAudioSource(e.target.value)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                color: 'var(--text-secondary)',
+                padding: '6px 12px',
+                fontSize: '13px',
+                outline: 'none',
+                cursor: 'pointer',
+                height: '36px'
+              }}
+            >
+              <option value="ai" style={{ background: '#0b0f19' }}>🔊 AI Voice</option>
+              <option value="system" style={{ background: '#0b0f19' }}>🎙️ System TTS</option>
+            </select>
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>Click to play spelling pronunciation</p>
         </div>
 
         {/* Input */}

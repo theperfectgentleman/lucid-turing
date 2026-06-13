@@ -42,6 +42,14 @@ export default function SessionConfig({ mode, currentUser, setView, onStart }) {
 
   const handleStart = async (e) => {
     if (e) e.preventDefault();
+    
+    // Unlock Speech Synthesis on user gesture
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const unlockUtterance = new SpeechSynthesisUtterance('');
+      window.speechSynthesis.speak(unlockUtterance);
+    }
+    
     try {
       setIsLaunching(true);
       const queryParams = new URLSearchParams({

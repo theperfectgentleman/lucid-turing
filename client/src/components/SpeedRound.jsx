@@ -72,6 +72,36 @@ export default function SpeedRound({ setView, currentUser, customWords }) {
   };
 
   const speakWord = (wordText) => {
+    const source = localStorage.getItem('bee_speller_audio_source') || 'ai';
+    speakWordWithSource(wordText, source);
+  };
+
+  const speakWordWithSource = async (wordText, source) => {
+    if (source === 'ai') {
+      try {
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(wordText.toLowerCase())}`);
+        if (res.ok) {
+          const data = await res.json();
+          const phonetic = data[0]?.phonetics?.find(p => p.audio && p.audio.trim() !== '');
+          if (phonetic && phonetic.audio) {
+            let audioUrl = phonetic.audio;
+            if (audioUrl.startsWith('//')) {
+              audioUrl = 'https:' + audioUrl;
+            }
+            const audio = new Audio(audioUrl);
+            await audio.play();
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('AI Pronunciation failed, falling back to System TTS:', err);
+      }
+    }
+    
+    speakSystemTTS(wordText);
+  };
+
+  const speakSystemTTS = (wordText) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(wordText);

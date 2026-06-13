@@ -111,6 +111,13 @@ function App() {
   }
 
   const startCustomSession = async (config) => {
+    // Unlock Speech Synthesis on user gesture
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const unlockUtterance = new SpeechSynthesisUtterance('');
+      window.speechSynthesis.speak(unlockUtterance);
+    }
+
     try {
       const queryParams = new URLSearchParams({
         userId: currentUser.id,
