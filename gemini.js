@@ -47,9 +47,9 @@ const extractWordsFromImage = async (imageBuffer, mimeType) => {
     throw new Error("GEMINI_API_KEY is not defined in the environment variables.");
   }
 
-  // Use gemini-1.5-flash as default, it's fast and multimodal
+  // Use gemini-3-pro-preview (3rd gen Pro model) for highly accurate OCR and etymology
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-3-pro-preview",
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: responseSchema,
