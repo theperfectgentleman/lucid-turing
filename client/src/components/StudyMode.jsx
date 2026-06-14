@@ -61,10 +61,24 @@ export default function StudyMode({ setView, currentUser, customWords }) {
 
   const currentWord = words[currentIndex];
 
+  const recordPronunciation = async (wordId) => {
+    if (!currentUser?.id || !wordId) return;
+    try {
+      await fetch(`/api/words/${wordId}/pronounce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.id })
+      });
+    } catch (e) {
+      console.error('Error recording pronunciation:', e);
+    }
+  };
+
   useEffect(() => {
     if (currentWord) {
       // Speak the word on new word load
       speakWord(currentWord.word);
+      recordPronunciation(currentWord.id);
       // Reset input states
       setInputSpelling('');
       setIsChecked(false);
@@ -346,7 +360,10 @@ export default function StudyMode({ setView, currentUser, customWords }) {
                   </h1>
                   <button 
                     className="audio-btn" 
-                    onClick={() => speakWord(currentWord.word)} 
+                    onClick={() => {
+                      speakWord(currentWord.word);
+                      recordPronunciation(currentWord.id);
+                    }} 
                     title="Listen to word"
                     style={{ 
                       width: '56px', 
@@ -476,8 +493,11 @@ export default function StudyMode({ setView, currentUser, customWords }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <button 
                     className="audio-btn" 
-                    onClick={() => speakWord(currentWord.word)} 
-                    title="Listen to word" 
+                    onClick={() => {
+                      speakWord(currentWord.word);
+                      recordPronunciation(currentWord.id);
+                    }} 
+                    title="Listen to word"  
                     style={{ width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
                     <Volume2 size={28} />

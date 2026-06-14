@@ -19,6 +19,7 @@ export default function WordExplorer({ currentUser, authState, setView }) {
   const [tag, setTag] = useState('');
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [autoSelectAction, setAutoSelectAction] = useState(null); // null, 'first', 'last'
   
   // Audio source settings
   const [audioSource, setAudioSource] = useState(() => {
@@ -35,6 +36,9 @@ export default function WordExplorer({ currentUser, authState, setView }) {
 
   // Refetch words list whenever page, category, tag, search query, or student profile changes
   useEffect(() => {
+    if (!autoSelectAction) {
+      setSelectedWord(null);
+    }
     fetchWords();
   }, [page, category, tag, selectedStudentId]);
 
@@ -80,7 +84,13 @@ export default function WordExplorer({ currentUser, authState, setView }) {
         setTotal(data.total || 0);
         
         // Auto-select first word if none is selected
-        if (data.words && data.words.length > 0 && !selectedWord) {
+        if (autoSelectAction === 'first' && data.words && data.words.length > 0) {
+          setSelectedWord(data.words[0]);
+          setAutoSelectAction(null);
+        } else if (autoSelectAction === 'last' && data.words && data.words.length > 0) {
+          setSelectedWord(data.words[data.words.length - 1]);
+          setAutoSelectAction(null);
+        } else if (data.words && data.words.length > 0 && !selectedWord) {
           setSelectedWord(data.words[0]);
         }
       }
@@ -101,6 +111,20 @@ export default function WordExplorer({ currentUser, authState, setView }) {
   // Pronunciation logic
   const speakWord = (wordText) => {
     speakWordWithSource(wordText, audioSource);
+  };
+
+  const recordPronunciation = async (wordId) => {
+    const studentId = currentUser?.id || selectedStudentId;
+    if (!studentId || !wordId) return;
+    try {
+      await fetch(`/api/words/${wordId}/pronounce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: studentId })
+      });
+    } catch (e) {
+      console.error('Error recording pronunciation:', e);
+    }
   };
 
   const speakWordWithSource = async (wordText, source) => {
@@ -162,6 +186,28 @@ export default function WordExplorer({ currentUser, authState, setView }) {
     }
   }, [words]);
 
+  const currentIndex = selectedWord ? words.findIndex(w => w.id === selectedWord.id) : -1;
+  const hasPrev = currentIndex > 0 || page > 1;
+  const hasNext = currentIndex < words.length - 1 || page < Math.ceil(total / limit);
+
+  const handlePrevWord = () => {
+    if (currentIndex > 0) {
+      setSelectedWord(words[currentIndex - 1]);
+    } else if (page > 1) {
+      setAutoSelectAction('last');
+      setPage(prev => prev - 1);
+    }
+  };
+
+  const handleNextWord = () => {
+    if (currentIndex < words.length - 1) {
+      setSelectedWord(words[currentIndex + 1]);
+    } else if (page < Math.ceil(total / limit)) {
+      setAutoSelectAction('first');
+      setPage(prev => prev + 1);
+    }
+  };
+
   return (
     <div style={{ width: '100%' }}>
       {/* Title */}
@@ -203,9 +249,12 @@ export default function WordExplorer({ currentUser, authState, setView }) {
                   </h1>
                   <button 
                     className="audio-btn" 
-                    onClick={() => speakWord(selectedWord.word)} 
+                    onClick={() => {
+                      speakWord(selectedWord.word);
+                      recordPronunciation(selectedWord.id);
+                    }} 
                     title="Pronounce word"
-                    style={{ width: '52px', height: '52px', padding: '0', display: 'flex', alignItems: 'center', justifyCenter: 'center' }}
+                    style={{ width: '52px', height: '52px', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
                     <Volume2 size={24} />
                   </button>
@@ -218,6 +267,30 @@ export default function WordExplorer({ currentUser, authState, setView }) {
                     <option value="ai" style={{ background: 'var(--bg-main)' }}>🔊 AI Voice</option>
                     <option value="system" style={{ background: 'var(--bg-main)' }}>🎙️ System TTS</option>
                   </select>
+
+                  {/* Word list traversal navigation */}
+                  <div style={{ display: 'flex', gap: '8px', borderLeft: '1px solid var(--border-color)', paddingLeft: '16px', marginLeft: '4px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handlePrevWord}
+                      disabled={!hasPrev}
+                      style={{ padding: '6px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', height: '36px' }}
+                      title="Previous Word"
+                    >
+                      <ArrowLeft size={14} /> Prev
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleNextWord}
+                      disabled={!hasNext}
+                      style={{ padding: '6px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', height: '36px' }}
+                      title="Next Word"
+                    >
+                      Next <ArrowRight size={14} />
+                    </button>
+                  </div>
                 </div>
                 
                 {/* Meta details (Origin, POS, Tag) */}

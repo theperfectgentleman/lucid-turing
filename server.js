@@ -443,6 +443,75 @@ app.get('/api/words/history', async (req, res) => {
   }
 });
 
+// 8.55 Record that a student played/listened to a word pronunciation (Learning event)
+app.post('/api/words/:id/pronounce', async (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+  
+  try {
+    // Check if word exists
+    const wordExists = await db.query('SELECT id FROM words WHERE id = $1', [id]);
+    if (wordExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Word not found' });
+    }
+
+    await db.query(`
+      INSERT INTO user_pronunciation_history (user_id, word_id, listened_at)
+      VALUES ($1, $2, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id, word_id) DO UPDATE SET
+        listened_at = CURRENT_TIMESTAMP
+    `, [userId, id]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error recording word pronunciation list:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// 8.56 Get pronunciation learning history for a user
+app.get('/api/words/pronunciation-history', async (req, res) => {
+  try {
+    const { userId, limit = 50, page = 1 } = req.query;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    const offset = (page - 1) * limit;
+    
+    // Get total count
+    const countRes = await db.query(`
+      SELECT COUNT(*) 
+      FROM user_pronunciation_history 
+      WHERE user_id = $1
+    `, [userId]);
+    const total = parseInt(countRes.rows[0].count);
+    
+    // Get list
+    const result = await db.query(`
+      SELECT w.*, p.listened_at
+      FROM user_pronunciation_history p
+      JOIN words w ON p.word_id = w.id
+      WHERE p.user_id = $1
+      ORDER BY p.listened_at DESC
+      LIMIT $2 OFFSET $3
+    `, [userId, parseInt(limit), offset]);
+    
+    res.json({
+      words: result.rows,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+  } catch (error) {
+    console.error('Error fetching pronunciation history:', error);
+    res.status(500).json({ error: 'Server error fetching pronunciation history' });
+  }
+});
+
 // 8.6 Get custom words query (random/sequential settings, categories filtering, history source option)
 app.get('/api/words/custom', async (req, res) => {
   try {

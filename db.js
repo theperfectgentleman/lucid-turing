@@ -89,6 +89,21 @@ const initDb = async () => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_progress_next_review ON user_word_progress(next_review_date);
     `);
+
+    // Create user_pronunciation_history table for tracking learning/listening history
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_pronunciation_history (
+        user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
+        word_id INTEGER REFERENCES words(id) ON DELETE CASCADE,
+        listened_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, word_id)
+      );
+    `);
+
+    // Create index on listened_at for fast queries
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_pronunciation_listened_at ON user_pronunciation_history(listened_at);
+    `);
     
     // Seed default user profile
     await client.query(`
