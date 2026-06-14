@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Loader, Play, Check, X, RefreshCw, UserCheck, Volume2 } from 'lucide-react';
+import { formatFullDateTime, formatShortDateTime } from '../utils/dateFormatter';
 
 export default function HistoryView({ setView, currentUser, authState, startCustomSession }) {
   const isAdmin = authState === 'admin';
@@ -323,8 +324,11 @@ export default function HistoryView({ setView, currentUser, authState, startCust
                               </span>
                             )}
                           </td>
-                          <td style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                            {w.last_attempt_date ? new Date(w.last_attempt_date).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                          <td 
+                            style={{ fontSize: '13px', color: 'var(--text-secondary)' }}
+                            title={w.last_attempt_date ? formatFullDateTime(w.last_attempt_date) : undefined}
+                          >
+                            {w.last_attempt_date ? formatShortDateTime(w.last_attempt_date) : '—'}
                           </td>
                         </tr>
                       );
@@ -387,8 +391,11 @@ export default function HistoryView({ setView, currentUser, authState, startCust
                         <td style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={w.definition}>
                           {w.definition}
                         </td>
-                        <td style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                          {w.listened_at ? new Date(w.listened_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                        <td 
+                          style={{ fontSize: '13px', color: 'var(--text-secondary)' }}
+                          title={w.listened_at ? formatFullDateTime(w.listened_at) : undefined}
+                        >
+                          {w.listened_at ? formatShortDateTime(w.listened_at) : '—'}
                         </td>
                       </tr>
                     ))}

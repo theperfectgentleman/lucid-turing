@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Volume2, Compass, Layers, ArrowLeft, ArrowRight, BookOpen, UserCheck, HelpCircle } from 'lucide-react';
+import { formatFullDateTime, formatShortDate } from '../utils/dateFormatter';
 
 export default function WordExplorer({ currentUser, authState, setView }) {
   const isAdmin = authState === 'admin';
@@ -404,8 +405,11 @@ export default function WordExplorer({ currentUser, authState, setView }) {
                       </div>
                       <div>
                         <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Next Review</span>
-                        <strong style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                          {selectedWord.next_review_date ? new Date(selectedWord.next_review_date).toLocaleDateString() : 'New Word'}
+                        <strong 
+                          style={{ fontSize: '13px', color: 'var(--text-secondary)' }}
+                          title={selectedWord.next_review_date ? formatFullDateTime(selectedWord.next_review_date) : undefined}
+                        >
+                          {selectedWord.next_review_date ? formatShortDate(selectedWord.next_review_date) : 'New Word'}
                         </strong>
                       </div>
                     </div>
