@@ -6,7 +6,9 @@ import SpeedRound from './components/SpeedRound'
 import AdminConfig from './components/AdminConfig'
 import HistoryView from './components/HistoryView'
 import SessionConfig from './components/SessionConfig'
-import { LayoutGrid, Brain, Zap, Settings, Award, LogOut, Lock, User, Clock, Sun, Moon, Menu, X } from 'lucide-react'
+import SlicesView from './components/SlicesView'
+import WordExplorer from './components/WordExplorer'
+import { LayoutGrid, Brain, Zap, Settings, Award, LogOut, Lock, User, Clock, Sun, Moon, Menu, X, Compass, Layers } from 'lucide-react'
 import './App.css'
 
 function App() {
@@ -341,6 +343,12 @@ function App() {
                 <Zap size={16} /> Speed Round
               </button>
               <button 
+                className={`nav-button ${view === 'explorer' ? 'active' : ''}`} 
+                onClick={() => setView('explorer')}
+              >
+                <Compass size={16} /> Word Explorer
+              </button>
+              <button 
                 className={`nav-button ${view === 'history' ? 'active' : ''}`} 
                 onClick={() => setView('history')}
               >
@@ -349,12 +357,26 @@ function App() {
             </>
           )}
           {authState === 'admin' && (
-            <button 
-              className={`nav-button ${view === 'admin' ? 'active' : ''}`} 
-              onClick={() => setView('admin')}
-            >
-              <Settings size={16} /> Admin Config
-            </button>
+            <>
+              <button 
+                className={`nav-button ${view === 'admin' ? 'active' : ''}`} 
+                onClick={() => setView('admin')}
+              >
+                <Settings size={16} /> Admin Config
+              </button>
+              <button 
+                className={`nav-button ${view === 'explorer' ? 'active' : ''}`} 
+                onClick={() => setView('explorer')}
+              >
+                <Compass size={16} /> Word Explorer
+              </button>
+              <button 
+                className={`nav-button ${view === 'history' ? 'active' : ''}`} 
+                onClick={() => setView('history')}
+              >
+                <Clock size={16} /> History
+              </button>
+            </>
           )}
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '16px' }}>
@@ -407,6 +429,12 @@ function App() {
                   <Zap size={18} /> Speed Round
                 </button>
                 <button 
+                  className={`mobile-nav-item ${view === 'explorer' ? 'active' : ''}`} 
+                  onClick={() => { setView('explorer'); setIsMobileMenuOpen(false); }}
+                >
+                  <Compass size={18} /> Word Explorer
+                </button>
+                <button 
                   className={`mobile-nav-item ${view === 'history' ? 'active' : ''}`} 
                   onClick={() => { setView('history'); setIsMobileMenuOpen(false); }}
                 >
@@ -415,12 +443,26 @@ function App() {
               </>
             )}
             {authState === 'admin' && (
-              <button 
-                className={`mobile-nav-item ${view === 'admin' ? 'active' : ''}`} 
-                onClick={() => { setView('admin'); setIsMobileMenuOpen(false); }}
-              >
-                <Settings size={18} /> Admin Config
-              </button>
+              <>
+                <button 
+                  className={`mobile-nav-item ${view === 'admin' ? 'active' : ''}`} 
+                  onClick={() => { setView('admin'); setIsMobileMenuOpen(false); }}
+                >
+                  <Settings size={18} /> Admin Config
+                </button>
+                <button 
+                  className={`mobile-nav-item ${view === 'explorer' ? 'active' : ''}`} 
+                  onClick={() => { setView('explorer'); setIsMobileMenuOpen(false); }}
+                >
+                  <Compass size={18} /> Word Explorer
+                </button>
+                <button 
+                  className={`mobile-nav-item ${view === 'history' ? 'active' : ''}`} 
+                  onClick={() => { setView('history'); setIsMobileMenuOpen(false); }}
+                >
+                  <Clock size={18} /> History
+                </button>
+              </>
             )}
             
             <div className="mobile-nav-divider"></div>
@@ -470,6 +512,17 @@ function App() {
             setView={setView} 
             onStart={(wordsList) => {
               setCustomWords(wordsList);
+              setView('slices');
+            }} 
+          />
+        )}
+        {view === 'slices' && authState === 'student' && (
+          <SlicesView 
+            words={customWords} 
+            mode={activeConfigMode} 
+            setView={setView} 
+            onStartSlice={(sliceWords) => {
+              setCustomWords(sliceWords);
               setView(activeConfigMode);
             }} 
           />
@@ -483,8 +536,20 @@ function App() {
         {view === 'speed' && authState === 'student' && (
           <SpeedRound setView={setView} currentUser={currentUser} customWords={customWords} />
         )}
-        {view === 'history' && authState === 'student' && (
-          <HistoryView setView={setView} currentUser={currentUser} startCustomSession={startCustomSession} />
+        {view === 'history' && (authState === 'student' || authState === 'admin') && (
+          <HistoryView 
+            setView={setView} 
+            currentUser={currentUser} 
+            authState={authState} 
+            startCustomSession={startCustomSession} 
+          />
+        )}
+        {view === 'explorer' && (authState === 'student' || authState === 'admin') && (
+          <WordExplorer 
+            currentUser={currentUser} 
+            authState={authState} 
+            setView={setView} 
+          />
         )}
         {view === 'admin' && authState === 'admin' && <AdminConfig setView={setView} />}
       </main>

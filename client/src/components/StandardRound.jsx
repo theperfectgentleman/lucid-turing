@@ -13,6 +13,7 @@ export default function StandardRound({ setView, currentUser, customWords }) {
   const [score, setScore] = useState(0);
   const [results, setResults] = useState([]); // Array of { word, userSpelling, correct, hintsUsed }
   const [isGameOver, setIsGameOver] = useState(false);
+  const [showWordListModal, setShowWordListModal] = useState(false);
   
   // Rules hints
   const [showDefinition, setShowDefinition] = useState(false);
@@ -295,12 +296,18 @@ export default function StandardRound({ setView, currentUser, customWords }) {
   const timerColor = timeLeft > 30 ? '' : timeLeft > 10 ? 'warning' : 'danger';
 
   return (
-    <div className="practice-container">
+    <>
+      <div className="practice-container">
       {/* Session Progress Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <button className="btn btn-secondary" style={{ padding: '8px 14px' }} onClick={() => setView('dashboard')}>
-          <ArrowLeft size={16} /> Quit Game
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn btn-secondary" style={{ padding: '8px 14px' }} onClick={() => setView('dashboard')}>
+            <ArrowLeft size={16} /> Quit Game
+          </button>
+          <button className="btn btn-secondary" style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => setShowWordListModal(true)}>
+            📋 Words in Round
+          </button>
+        </div>
         <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-secondary)' }}>
           Standard Round: Word {currentIndex + 1} of {words.length}
         </span>
@@ -443,6 +450,92 @@ export default function StandardRound({ setView, currentUser, customWords }) {
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Word List Modal */}
+      {showWordListModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }} onClick={() => setShowWordListModal(false)}>
+          <div className="round-words-modal" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>📋 Round Word List</h3>
+              <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => setShowWordListModal(false)}>
+                Close
+              </button>
+            </div>
+            
+            <div style={{ overflowY: 'auto', flexGrow: 1, paddingRight: '4px' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                Words in this standard round:
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {words.map((w, idx) => {
+                  const res = results[idx];
+                  const isCurrent = idx === currentIndex;
+                  
+                  let statusEmoji = '⚪';
+                  let statusText = 'Not Practiced';
+                  let statusColor = 'var(--text-secondary)';
+                  
+                  if (isCurrent) {
+                    statusEmoji = '🔵';
+                    statusText = 'Active';
+                    statusColor = 'var(--primary-hover)';
+                  } else if (res) {
+                    if (res.correct) {
+                      statusEmoji = '🟢';
+                      statusText = 'Correct';
+                      statusColor = 'var(--success)';
+                    } else {
+                      statusEmoji = '🔴';
+                      statusText = 'Incorrect';
+                      statusColor = 'var(--error)';
+                    }
+                  }
+                  
+                  return (
+                    <div 
+                      key={w.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        background: isCurrent ? 'rgba(79, 70, 229, 0.15)' : 'rgba(255,255,255,0.02)',
+                        border: isCurrent ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-sm)',
+                        transition: 'var(--transition)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: isCurrent ? 'var(--primary-hover)' : 'var(--text-primary)' }}>
+                          {idx + 1}. {w.word}
+                        </span>
+                        {isCurrent && <span style={{ fontSize: '11px', background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>Active</span>}
+                      </div>
+                      <span style={{ fontSize: '12px', color: statusColor, fontWeight: '600' }}>
+                        {statusEmoji} {statusText}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    </>
   );
 }

@@ -75,8 +75,14 @@ const initDb = async () => {
         attempts INTEGER DEFAULT 0,
         correct_attempts INTEGER DEFAULT 0,
         last_quality INTEGER,
+        last_attempt_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (user_id, word_id)
       );
+    `);
+
+    // Ensure last_attempt_date column exists in existing database deployments
+    await client.query(`
+      ALTER TABLE user_word_progress ADD COLUMN IF NOT EXISTS last_attempt_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
 
     // Create index on next_review_date for speed

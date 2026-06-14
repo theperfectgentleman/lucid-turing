@@ -13,6 +13,7 @@ export default function SpeedRound({ setView, currentUser, customWords }) {
   const [results, setResults] = useState([]); // Array of { word, userSpelling, correct }
   const [isGameOver, setIsGameOver] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [showWordListModal, setShowWordListModal] = useState(false);
   
   // 90 seconds overall timer
   const [timeLeft, setTimeLeft] = useState(90);
@@ -283,20 +284,26 @@ export default function SpeedRound({ setView, currentUser, customWords }) {
   const timerColor = timeLeft > 40 ? '' : timeLeft > 15 ? 'warning' : 'danger';
 
   return (
-    <div className="practice-container">
-      {/* Head section */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <button className="btn btn-secondary" style={{ padding: '8px 14px' }} onClick={() => {
-          clearInterval(timerRef.current);
-          setView('dashboard');
-        }}>
-          <ArrowLeft size={16} /> Exit Round
-        </button>
-        <div style={{ display: 'flex', gap: '16px', fontSize: '14px', fontWeight: '600' }}>
-          <span>Correct: <strong style={{ color: 'var(--success)' }}>{correctCount}</strong></span>
-          <span>Attempted: <strong>{attemptsCount}</strong></span>
+    <>
+      <div className="practice-container">
+        {/* Head section */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-secondary" style={{ padding: '8px 14px' }} onClick={() => {
+              clearInterval(timerRef.current);
+              setView('dashboard');
+            }}>
+              <ArrowLeft size={16} /> Exit Round
+            </button>
+            <button className="btn btn-secondary" style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => setShowWordListModal(true)}>
+              📋 Words in Round
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', fontSize: '14px', fontWeight: '600' }}>
+            <span>Correct: <strong style={{ color: 'var(--success)' }}>{correctCount}</strong></span>
+            <span>Attempted: <strong>{attemptsCount}</strong></span>
+          </div>
         </div>
-      </div>
 
       <div className="card" style={{ padding: '32px' }}>
         {/* Timer UI */}
@@ -338,6 +345,97 @@ export default function SpeedRound({ setView, currentUser, customWords }) {
           </button>
         </form>
       </div>
+
+      {/* Word List Modal */}
+      {showWordListModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }} onClick={() => setShowWordListModal(false)}>
+          <div className="round-words-modal" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>📋 Round Word List</h3>
+              <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => setShowWordListModal(false)}>
+                Close
+              </button>
+            </div>
+            
+            <div style={{ overflowY: 'auto', flexGrow: 1, paddingRight: '4px' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                Words in this speed round:
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {words.slice(0, 50).map((w, idx) => {
+                  const res = results[idx];
+                  const isCurrent = idx === currentIndex;
+                  
+                  let statusEmoji = '⚪';
+                  let statusText = 'Not Practiced';
+                  let statusColor = 'var(--text-secondary)';
+                  
+                  if (isCurrent) {
+                    statusEmoji = '🔵';
+                    statusText = 'Active';
+                    statusColor = 'var(--primary-hover)';
+                  } else if (res) {
+                    if (res.correct) {
+                      statusEmoji = '🟢';
+                      statusText = 'Correct';
+                      statusColor = 'var(--success)';
+                    } else {
+                      statusEmoji = '🔴';
+                      statusText = 'Incorrect';
+                      statusColor = 'var(--error)';
+                    }
+                  }
+                  
+                  return (
+                    <div 
+                      key={w.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        background: isCurrent ? 'rgba(79, 70, 229, 0.15)' : 'rgba(255,255,255,0.02)',
+                        border: isCurrent ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-sm)',
+                        transition: 'var(--transition)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: isCurrent ? 'var(--primary-hover)' : 'var(--text-primary)' }}>
+                          {idx + 1}. {w.word}
+                        </span>
+                        {isCurrent && <span style={{ fontSize: '11px', background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>Active</span>}
+                      </div>
+                      <span style={{ fontSize: '12px', color: statusColor, fontWeight: '600' }}>
+                        {statusEmoji} {statusText}
+                      </span>
+                    </div>
+                  );
+                })}
+                {words.length > 50 && (
+                  <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', padding: '8px' }}>
+                    And {words.length - 50} more words...
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+    </>
   );
 }

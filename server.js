@@ -402,7 +402,8 @@ app.get('/api/words/history', async (req, res) => {
              p.attempts, 
              p.correct_attempts, 
              p.next_review_date, 
-             p.last_quality
+             p.last_quality,
+             p.last_attempt_date
       FROM user_word_progress p
       JOIN words w ON p.word_id = w.id
       WHERE p.user_id = $1 AND p.attempts > 0
@@ -425,7 +426,7 @@ app.get('/api/words/history', async (req, res) => {
     const totalRes = await db.query(countQuery, params);
     const total = parseInt(totalRes.rows[0].count);
     
-    query += ` ORDER BY p.next_review_date DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    query += ` ORDER BY p.last_attempt_date DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
     params.push(parseInt(limit), offset);
     
     const result = await db.query(query, params);
@@ -542,6 +543,80 @@ app.get('/api/words/custom', async (req, res) => {
   }
 });
 
+// 8.7 Get words for Explorer (search, filters, pagination, with optional per-user SRS progress stats)
+app.get('/api/words/explorer', async (req, res) => {
+  try {
+    const { userId, category, tag, search, page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+    
+    let query = '';
+    const params = [];
+    let paramIndex = 1;
+    
+    if (userId && userId !== 'null' && userId !== 'undefined' && userId !== '') {
+      query = `
+        SELECT w.*, 
+               COALESCE(p.box, 1) as box, 
+               COALESCE(p.attempts, 0) as attempts,
+               COALESCE(p.correct_attempts, 0) as correct_attempts,
+               p.last_quality,
+               p.next_review_date
+        FROM words w
+        LEFT JOIN user_word_progress p ON p.word_id = w.id AND p.user_id = $${paramIndex++}
+        WHERE 1=1
+      `;
+      params.push(parseInt(userId));
+    } else {
+      query = `
+        SELECT w.*, 
+               1 as box, 
+               0 as attempts,
+               0 as correct_attempts,
+               NULL as last_quality,
+               NULL as next_review_date
+        FROM words w
+        WHERE 1=1
+      `;
+    }
+    
+    if (category && category !== 'all' && category !== '') {
+      query += ` AND w.category = $${paramIndex++}`;
+      params.push(category);
+    }
+    
+    if (tag && tag !== 'all' && tag !== '') {
+      query += ` AND w.tag = $${paramIndex++}`;
+      params.push(tag);
+    }
+    
+    if (search && search.trim() !== '') {
+      query += ` AND w.word ILIKE $${paramIndex++}`;
+      params.push(`%${search.trim()}%`);
+    }
+    
+    // Get total count
+    const countQuery = `SELECT COUNT(*) FROM (${query}) as count_table`;
+    const countParams = [...params];
+    const totalResult = await db.query(countQuery, countParams);
+    const total = parseInt(totalResult.rows[0].count);
+    
+    query += ` ORDER BY w.word ASC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    params.push(parseInt(limit), offset);
+    
+    const result = await db.query(query, params);
+    
+    res.json({
+      words: result.rows,
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+  } catch (error) {
+    console.error('Error in words explorer API:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // 9. Update SRS status of a word (SuperMemo-2 SM2)
 app.post('/api/words/:id/review', async (req, res) => {
   const { id } = req.params;
@@ -612,8 +687,8 @@ app.post('/api/words/:id/review', async (req, res) => {
     // Upsert user progress
     await db.query(`
       INSERT INTO user_word_progress (
-        user_id, word_id, attempts, correct_attempts, box, interval, ease_factor, next_review_date, last_quality
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        user_id, word_id, attempts, correct_attempts, box, interval, ease_factor, next_review_date, last_quality, last_attempt_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
       ON CONFLICT (user_id, word_id) DO UPDATE SET
         attempts = EXCLUDED.attempts,
         correct_attempts = EXCLUDED.correct_attempts,
@@ -621,7 +696,8 @@ app.post('/api/words/:id/review', async (req, res) => {
         interval = EXCLUDED.interval,
         ease_factor = EXCLUDED.ease_factor,
         next_review_date = EXCLUDED.next_review_date,
-        last_quality = EXCLUDED.last_quality
+        last_quality = EXCLUDED.last_quality,
+        last_attempt_date = CURRENT_TIMESTAMP
     `, [userId, id, attempts, correct_attempts, box, interval, ease_factor, nextReviewDate, quality]);
     
     res.json({
