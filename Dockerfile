@@ -1,5 +1,5 @@
 # Use the official Node.js alpine image
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Set the working directory
 WORKDIR /app
@@ -24,7 +24,7 @@ RUN cd client && npm run build
 RUN npm prune --production && cd client && rm -rf node_modules
 
 # Final production stage
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
